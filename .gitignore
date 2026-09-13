@@ -1,0 +1,17 @@
+.env
+.env.test
+.env.live
+logs/
+staticfiles/
+__pycache__/
+*.pyc
+*.pyo
+*.sqlite3
+.venv/
+venv/
+env/
+media/
+product_images/
+*.egg-info/
+.vscode/
+.idea/

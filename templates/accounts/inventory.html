@@ -1,0 +1,80 @@
+{% extends "accounts/base.html" %}
+{% block dashboard_content %}
+{% load humanize %}
+
+<h3 class="mt-3">Inventory</h3>
+
+
+{# =============================== #}
+{# 2. PRODUCT-LEVEL INVENTORY #}
+{# =============================== #}
+
+<div class="card shadow-sm">
+  <div class="card-body table-responsive">
+    <table id="inventoryTable" class="table table-sm table-hover align-middle erp-table w-100">
+      <thead class="table-light">
+        <tr>
+          <th>SKU</th>
+          <th>Product</th>
+          <th>Supplier</th>
+          <th>Branch</th>
+          <th class="text-end">On hand</th>
+          <th class="text-end">Value</th>
+          <th class="text-center">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in products %}
+        <tr class="
+          {% if p.usable_qty == 0 %}
+                table-danger
+          {% elif p.usable_qty > 0 and p.usable_qty <= 5 %}
+                table-danger
+          {% elif p.usable_qty > 5 and p.usable_qty <= 10 %}
+                table-warning
+          {% elif p.expired_qty > 0 %}
+            table-warning
+          {% elif p.usable_qty > 10  %}
+                table-info
+            {% endif %}
+            ">
+          <td class="text-monospace">{{ p.product__sku }}</td>
+          <td>{{ p.product__name }}</td>
+          <td>{{ p.product__supplier__name|default:"-" }}</td>
+          <td>{{ p.branch__name }}</td>
+          <td class="text-end" data-order="{{ p.on_hand }}"> {{ p.on_hand|floatformat:0|intcomma }}</td>
+          <td class="text-end" data-order="{{ p.value }}"> {{ p.value|floatformat:2|intcomma }}</td>
+          <td
+            class="text-center"
+            data-order="{{ p.usable_qty }}">
+            {% if p.expired_qty > 0 %}
+              <span class="badge text-bg-danger d-block mb-1">Expired: {{ p.expired_qty|floatformat:0|intcomma }}</span>
+            {% endif %}
+            {% if p.usable_qty == 0 %}
+              <span class="badge text-bg-danger">Out of stock</span>
+            {% elif p.usable_qty <= 5 %}
+              <span class="badge text-bg-danger">Restock: {{ p.usable_qty|floatformat:0|intcomma }}</span>
+            {% elif p.usable_qty <= 10 %}
+              <span class="badge text-bg-warning">Low: {{ p.usable_qty|floatformat:0|intcomma }}</span>
+            {% elif p.usable_qty <= 20 %}
+              <span class="badge text-bg-info">Monitor: {{ p.usable_qty|floatformat:0|intcomma }}</span>
+            {% else %}
+              <span class="badge text-bg-success">OK: {{ p.usable_qty|floatformat:0|intcomma }}</span>
+            {% endif %}
+        </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="text-center text-muted py-3">No product-level inventory</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="mt-3 text-end">
+  <a href="{% url 'accounts:transfer-history' %}" class="btn btn-outline-primary btn-sm">
+      <i class="bi bi-arrow-left-right me-1"></i> View Transfer History
+  </a>
+</div>
+
+{% endblock %}

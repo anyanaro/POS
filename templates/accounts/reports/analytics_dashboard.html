@@ -1,0 +1,99 @@
+{% extends "accounts/base.html" %}
+{% block dashboard_content %}
+<div class="container-fluid">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div><h3>Smart Analytics</h3><div class="text-muted">Sales margin, inventory position, velocity, and stock risk</div></div>
+  </div>
+  <form id="filters" class="row g-2 mb-4 report-filters">
+    <div class="col-md-2"><label class="form-label">Branch</label><select name="branch" class="form-select"><option value="">Active branch</option>{% for branch in branches %}<option value="{{ branch.id }}" {% if selected_branch == branch.id|stringformat:'s' %}selected{% endif %}>{{ branch.name }}</option>{% endfor %}</select></div>
+    <div class="col-md-2"><label class="form-label">User</label><select name="user" class="form-select"><option value="">All users</option>{% for user in users %}<option value="{{ user.id }}" {% if selected_user == user.id|stringformat:'s' %}selected{% endif %}>{{ user.username }}</option>{% endfor %}</select></div>
+    <div class="col-md-2"><label class="form-label">From</label><input type="date" name="start" class="form-control" value="{{ start }}"></div>
+    <div class="col-md-2"><label class="form-label">To</label><input type="date" name="end" class="form-control" value="{{ end }}"></div>
+    <div class="col-md-2"><label class="form-label">Top products</label><select name="limit" class="form-select"><option value="10" {% if limit == 10 %}selected{% endif %}>Top 10</option><option value="20" {% if limit == 20 %}selected{% endif %}>Top 20</option><option value="50" {% if limit == 50 %}selected{% endif %}>Top 50</option></select></div>
+    <div class="col-md-2"><label class="form-label">Risk status</label><select id="risk-status" class="form-select"><option value="ALL">All statuses</option><option value="FAST">Fast</option><option value="SLOW">Slow</option><option value="DEAD">Dead</option><option value="EXPIRING">Expiring</option><option value="EXPIRED">Expired</option></select></div>
+    <div class="col-md-2"><label class="form-label">Max stock age</label><select id="max-stock-age" class="form-select"><option value="">Any age</option><option value="30">30+ days</option><option value="60">60+ days</option><option value="90">90+ days</option></select></div>
+    <div class="col-md-2"><label class="form-label">Expiry window</label><select id="expiry-window" class="form-select"><option value="">Any expiry</option><option value="30">Expires in 30 days</option><option value="90">Expires in 90 days</option></select></div>
+    <div class="col-md-2 d-flex align-items-end"><button class="btn btn-primary w-100">Refresh</button></div>
+  </form>
+
+  <div class="row g-3 mb-4" id="summary"></div>
+
+  <div class="card mb-3"><div class="card-header">Sales by branch</div><div class="table-responsive"><table id="analyticsBranchesTable" data-dynamic-table="true" class="table table-sm mb-0 erp-table"><thead><tr><th>Branch</th><th class="text-end">Units</th><th class="text-end">Revenue</th><th class="text-end">Gross profit</th><th class="text-end">Margin</th></tr></thead><tbody id="branch-rows"></tbody></table></div></div>
+
+  <div class="card mb-3"><div class="card-header">Sales by user for selected branch</div><div class="table-responsive"><table id="analyticsUsersTable" data-dynamic-table="true" class="table table-sm mb-0 erp-table"><thead><tr><th>User</th><th>Branch</th><th class="text-end">Units</th><th class="text-end">Revenue</th><th class="text-end">Gross profit</th><th class="text-end">Margin</th></tr></thead><tbody id="user-rows"></tbody></table></div></div>
+
+  <div class="row g-3">
+    <div class="col-lg-7"><div class="card"><div class="card-header">Top products by revenue and margin</div><div class="table-responsive"><table id="analyticsSalesTable" data-dynamic-table="true" class="table table-sm mb-0 erp-table"><thead><tr><th>Product</th><th class="text-end">Units</th><th class="text-end">Revenue</th><th class="text-end">Gross profit</th><th class="text-end">Margin</th></tr></thead><tbody id="sales-rows"></tbody></table></div></div></div>
+    <div class="col-lg-5"><div class="card"><div class="card-header">Stock risk</div><div class="table-responsive"><table id="analyticsRiskTable" data-dynamic-table="true" class="table table-sm mb-0 erp-table"><thead><tr><th>Product</th><th>Status</th><th class="text-end">On hand</th><th class="text-end">Stock age</th><th class="text-end">Days to expire</th></tr></thead><tbody id="risk-rows"></tbody></table></div></div></div>
+  </div>
+</div>
+<script>
+const form = document.getElementById('filters');
+const money = value => Number(value || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+async function loadAnalytics() {
+  const params = new URLSearchParams(new FormData(form));
+  const response = await fetch('{% url "accounts:analytics-api" %}?' + params.toString(), {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+  if (!response.ok) throw new Error('Analytics request failed (' + response.status + ')');
+  const data = await response.json();
+  const totals = data.sales.totals;
+  document.getElementById('summary').innerHTML = [['Revenue', totals.revenue], ['COGS', totals.cogs], ['Gross profit', totals.gross_profit], ['Margin', totals.revenue ? (Number(totals.gross_profit) / Number(totals.revenue) * 100).toFixed(2) + '%' : '0.00%']].map(item => `<div class="col-md-3"><div class="card"><div class="card-body"><div class="text-muted small">${item[0]}</div><div class="fs-4 fw-semibold">${item[0] === 'Margin' ? item[1] : 'KES ' + money(item[1])}</div></div></div></div>`).join('');
+  document.getElementById('sales-rows').innerHTML = data.sales.products.map(row => `<tr><td>${row.product__name}<small class="d-block text-muted">${row.product__sku}</small></td><td class="text-end">${Number(row.units).toFixed(2)}</td><td class="text-end">KES ${money(row.revenue)}</td><td class="text-end">KES ${money(row.gross_profit)}</td><td class="text-end">${Number(row.margin_pct).toFixed(2)}%</td></tr>`).join('') || '<tr><td colspan="5" class="text-center text-muted">No sales in this period.</td></tr>';
+  applyRiskFilters(data.velocity);
+  document.getElementById('branch-rows').innerHTML = data.sales.branches.map(row => `<tr><td>${row.header__branch__name || 'Unassigned'}</td><td class="text-end">${Number(row.units).toFixed(2)}</td><td class="text-end">KES ${money(row.revenue)}</td><td class="text-end">KES ${money(row.gross_profit)}</td><td class="text-end">${Number(row.margin_pct).toFixed(2)}%</td></tr>`).join('') || '<tr><td colspan="5" class="text-center text-muted">No branch sales for this filter.</td></tr>';
+  document.getElementById('user-rows').innerHTML = data.sales.users.map(row => `<tr><td>${row.header__cashier__username || 'Unknown'}</td><td>${row.header__branch__name || 'Unassigned'}</td><td class="text-end">${Number(row.units).toFixed(2)}</td><td class="text-end">KES ${money(row.revenue)}</td><td class="text-end">KES ${money(row.gross_profit)}</td><td class="text-end">${Number(row.margin_pct).toFixed(2)}%</td></tr>`).join('') || '<tr><td colspan="6" class="text-center text-muted">No user sales for this filter.</td></tr>';
+  refreshDataTables();
+}
+
+let lastVelocity = [];
+function applyRiskFilters(velocity) {
+  if (velocity) lastVelocity = velocity;
+  const riskStatus = document.getElementById('risk-status').value;
+  const maxStockAge = Number(document.getElementById('max-stock-age').value || 0);
+  const expiryWindow = Number(document.getElementById('expiry-window').value || 0);
+  const riskRows = lastVelocity.filter(row => {
+    if (riskStatus !== 'ALL' && row.classification !== riskStatus) return false;
+    if (maxStockAge && (row.stock_age_days === null || row.stock_age_days < maxStockAge)) return false;
+    if (expiryWindow && (row.days_to_expire === null || row.days_to_expire > expiryWindow)) return false;
+    return true;
+  });
+  document.getElementById('risk-rows').innerHTML = riskRows.slice(0, 50).map(row => `<tr><td>${row.name}<small class="d-block text-muted">${row.sku}</small></td><td><span class="badge ${row.classification === 'EXPIRED' ? 'bg-danger' : row.classification === 'EXPIRING' || row.classification === 'DEAD' ? 'bg-warning text-dark' : 'bg-secondary'}">${row.classification}</span></td><td class="text-end">${Number(row.on_hand).toFixed(2)}</td><td class="text-end">${row.stock_age_days === null ? '-' : row.stock_age_days + ' days'}</td><td class="text-end">${row.days_to_expire === null ? '-' : Number(row.days_to_expire).toFixed(1) + ' days'}</td></tr>`).join('') || '<tr><td colspan="5" class="text-center text-muted">No stock matches these risk filters.</td></tr>';
+  if (window.jQuery && $.fn.DataTable && $.fn.DataTable.isDataTable('#analyticsRiskTable')) {
+    $('#analyticsRiskTable').DataTable().destroy();
+  }
+  refreshDataTable('#analyticsRiskTable');
+}
+
+function refreshDataTable(selector) {
+  if (!(window.jQuery && $.fn.DataTable)) return;
+  const table = $(selector);
+  if (!table.length) return;
+  table.DataTable({
+    pageLength: 10,
+    order: [],
+    responsive: true,
+    autoWidth: false,
+    dom: "<'row mb-3'<'col-md-6'B><'col-md-6'f>>rt<'row mt-3'<'col-md-6'i><'col-md-6'p>>",
+    buttons: [
+      {extend: 'excelHtml5', text: '<i class="bi bi-file-earmark-excel me-1"></i> Excel', className: 'btn btn-success btn-sm', title: 'Smart Analytics'},
+      {extend: 'csvHtml5', text: '<i class="bi bi-filetype-csv me-1"></i> CSV', className: 'btn btn-primary btn-sm', title: 'Smart Analytics'},
+      {extend: 'print', text: '<i class="bi bi-printer me-1"></i> Print', className: 'btn btn-secondary btn-sm', title: 'Smart Analytics'}
+    ]
+  });
+}
+
+function refreshDataTables() {
+  ['#analyticsSalesTable', '#analyticsBranchesTable', '#analyticsUsersTable'].forEach(selector => {
+    if (window.jQuery && $.fn.DataTable && $.fn.DataTable.isDataTable(selector)) $(selector).DataTable().destroy();
+    refreshDataTable(selector);
+  });
+}
+
+form.addEventListener('submit', event => { event.preventDefault(); loadAnalytics(); });
+['risk-status', 'max-stock-age', 'expiry-window'].forEach(id => {
+  document.getElementById(id).addEventListener('change', () => applyRiskFilters());
+});
+loadAnalytics().catch(error => {
+  document.getElementById('summary').innerHTML = `<div class="col-12"><div class="alert alert-danger">${error.message}</div></div>`;
+});
+</script>
+{% endblock %}

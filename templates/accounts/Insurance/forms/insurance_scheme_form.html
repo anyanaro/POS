@@ -1,0 +1,158 @@
+{% extends "accounts/base.html" %}
+{% block dashboard_content %}
+{% block title %}
+    {% if mode == "edit" %}Edit Insurance Scheme{% else %}New Insurance Scheme{% endif %}
+{% endblock %}
+
+{% block page_title %}
+<i class="bi bi-diagram-3 me-1"></i>
+{% if mode == "edit" %}Edit Insurance Scheme{% else %}New Insurance Scheme{% endif %}
+{% endblock %}
+
+
+<div class="container-fluid mt-4">
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+
+            <form method="post">
+                {% csrf_token %}
+
+                <!-- ================= PRIMARY PANEL (ANCHOR + CONTACT) ================= -->
+                <div class="p-3 mb-4 border rounded bg-light">
+
+                    <div class="row g-4">
+                
+                        <!-- INSURANCE -->
+                        <div class="col-md-6 d-flex flex-column h-100">
+                            <label class="form-label fw-semibold fs-5 mb-2">
+                                <i class="bi bi-building me-1"></i> Insurance
+                            </label>
+                            {{ form.insurance }}
+                        </div>
+                
+                        <!-- SCHEME NAME -->
+                        <div class="col-md-6 d-flex flex-column h-100">
+                            <label class="form-label fw-semibold fs-5 mb-2">
+                                Scheme Name
+                            </label>
+                            {{ form.name }}
+                        </div>
+                
+                        <!-- CONTACT PERSON -->
+                        <div class="col-md-4 d-flex flex-column h-100">
+                            <label class="form-label fw-semibold mb-2">
+                                Contact Person
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="bi bi-person"></i>
+                                </span>
+                                {{ form.contact_person }}
+                            </div>
+                        </div>
+                
+                        <!-- PHONE -->
+                        <div class="col-md-4 d-flex flex-column h-100">
+                            <label class="form-label fw-semibold mb-2">
+                                Phone
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="bi bi-telephone"></i>
+                                </span>
+                                {{ form.phone }}
+                            </div>
+                        </div>
+                
+                        <!-- EMAIL -->
+                        <div class="col-md-4 d-flex flex-column h-100">
+                            <label class="form-label fw-semibold mb-2">
+                                Email
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="bi bi-envelope"></i>
+                                </span>
+                                {{ form.email }}
+                            </div>
+                        </div>
+                
+                        <!-- DISCOUNT -->
+                        <div class="col-md-4 d-flex flex-column h-100">
+                            <label class="form-label fw-semibold mb-2">
+                                Discount (%)
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="bi bi-percent"></i>
+                                </span>
+                                {{ form.discount_percent }}
+                            </div>
+                        </div>
+                
+                    </div>
+                
+                </div>
+                
+                <!-- ================= SECONDARY PANEL ================= -->
+                <div class="border-top pt-4">
+                
+                    <div class="row g-4">
+                
+                        <!-- ADDRESS -->
+                        <div class="col-md-6 d-flex flex-column h-100">
+                            <label class="form-label fw-semibold mb-2">
+                                Address
+                            </label>
+                            {{ form.address }}
+                        </div>
+                
+                        <!-- REMARKS -->
+                        <div class="col-md-6 d-flex flex-column h-100">
+                            <label class="form-label fw-semibold mb-2">
+                                Remarks
+                            </label>
+                            {{ form.remarks }}
+                        </div>
+                
+                    </div>
+                
+                </div>
+
+                <!-- ================= STATUS (EDIT ONLY) ================= -->
+                {% if mode == "edit" %}
+                    <div class="mt-4 p-3 border rounded bg-light">
+                        <label class="form-label fw-semibold d-flex align-items-center gap-2">
+                            <i class="bi bi-toggle-on"></i> Status
+                        </label>
+
+                        <div class="form-check form-switch fs-5">
+                            {{ form.is_active }}
+                            <label class="form-check-label ms-2">
+                                Active
+                            </label>
+                        </div>
+                    </div>
+                {% endif %}
+
+                <!-- ================= ACTIONS ================= -->
+                <div class="mt-4 d-flex justify-content-between">
+                    <a href="{% url 'accounts:insurance_scheme_list' %}"
+                       class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left"></i> Cancel
+                    </a>
+
+                    <button class="btn btn-primary px-4">
+                        <i class="bi bi-save me-1"></i>
+                        {% if mode == "edit" %}Save Changes{% else %}Create Scheme{% endif %}
+                    </button>
+                </div>
+
+            </form>
+
+        </div>
+    </div>
+
+</div>
+{% endblock %}

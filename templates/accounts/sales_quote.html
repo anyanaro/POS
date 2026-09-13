@@ -1,0 +1,513 @@
+{% extends "accounts/base.html" %}
+{% block dashboard_content %}
+
+<h3 class="mt-3">Sales Quote</h3>
+<p class="text-muted small">Build a quote for a customer and download it as a PDF. Prices default to the last price the item was sold at.</p>
+
+<div class="row g-3">
+
+    <!-- LEFT COLUMN: SEARCH -->
+    <div class="col-lg-6">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white d-flex align-items-center gap-2">
+                <strong>Find Product</strong>
+                <span class="text-muted small">· scan barcode or search SKU/name</span>
+            </div>
+
+            <div class="card-body">
+
+                <form id="search-form" class="row g-2 align-items-end">
+                    <div class="col-8">
+                        <label class="form-label">Barcode / Search</label>
+                        <input id="search-input" class="form-control" placeholder="Scan barcode, SKU or type name…" autofocus>
+                    </div>
+
+                    <div class="col-4">
+                        <label class="form-label">Qty</label>
+                        <input type="number" id="search-qty" class="form-control" value="1" min="1" step="1">
+                    </div>
+
+                    <div class="col-12 d-flex gap-2">
+                        <button class="btn btn-outline-primary" type="submit">
+                            <i class="bi bi-search me-1"></i> Add
+                        </button>
+
+                        <button class="btn btn-outline-secondary" type="button" id="clear-search">
+                            Clear
+                        </button>
+                    </div>
+                </form>
+
+                <div class="mt-3">
+                    <div class="text-muted small mb-1">Matches</div>
+
+                    <div class="table-responsive" style="max-height:320px; overflow:auto;">
+                        <table class="table table-sm table-hover align-middle mb-0 erp-table">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>SKU</th>
+                                    <th>Name</th>
+                                    <th class="text-end">Action</th>
+                                </tr>
+                            </thead>
+
+                            <tbody id="result-body">
+                                <tr>
+                                    <td colspan="3" class="text-center text-muted py-3">Search to see results…</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- RIGHT COLUMN: QUOTE -->
+    <div class="col-lg-6">
+        <div class="card shadow-sm">
+
+            <div class="card-header bg-white d-flex justify-content-between">
+                <strong>Quote</strong>
+                <span class="text-muted small" id="quote-count">0 items</span>
+            </div>
+
+            <div class="card-body">
+
+                <label class="form-label">Customer name</label>
+                <input id="customer-name" class="form-control" placeholder="Customer name">
+
+            </div>
+
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width:35%">Item</th>
+                                <th class="text-end" style="width:20%">Price</th>
+                                <th class="text-end" style="width:15%">Qty</th>
+                                <th class="text-end" style="width:20%">Total</th>
+                                <th class="text-end" style="width:10%">Remove</th>
+                            </tr>
+                        </thead>
+
+                        <tbody id="quote-body">
+                            <tr><td colspan="5" class="text-center text-muted py-3">No items yet</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card-footer bg-white">
+
+                <div class="d-flex justify-content-between">
+                    <div class="fs-5 fw-semibold">Total</div>
+                    <div class="fs-5 fw-bold text-primary" id="grand-total-text">KSHS 0.00</div>
+                </div>
+
+                <div class="d-flex gap-2 mt-3">
+                    <button id="btn-download-quote" class="btn btn-primary flex-grow-1">
+                        <i class="bi bi-file-earmark-pdf me-1"></i> Download PDF Quote
+                    </button>
+
+                    <button id="btn-clear-quote" class="btn btn-outline-secondary">
+                        <i class="bi bi-x-circle me-1"></i> Clear
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ================= TOAST ================= -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index:1080">
+  <div id="toast" class="toast align-items-center text-bg-success border-0" role="alert">
+      <div class="d-flex">
+          <div id="toast-body" class="toast-body">Done</div>
+          <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+      </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    "use strict";
+
+    const resultBody = document.getElementById("result-body");
+    const quoteBody = document.getElementById("quote-body");
+    const quoteCount = document.getElementById("quote-count");
+    const grandText = document.getElementById("grand-total-text");
+    const customerName = document.getElementById("customer-name");
+
+    const searchForm = document.getElementById("search-form");
+    const searchInput = document.getElementById("search-input");
+    const searchQty = document.getElementById("search-qty");
+    const clearSearchBtn = document.getElementById("clear-search");
+
+    const downloadBtn = document.getElementById("btn-download-quote");
+    const clearQuoteBtn = document.getElementById("btn-clear-quote");
+
+    let quote = [];
+
+    function csrftoken() {
+        const match = document.cookie.match(/csrftoken=([^;]+)/);
+        return match ? match[1] : "";
+    }
+
+    function money(value) {
+        const amount = Number(value || 0).toFixed(2);
+        return "KSHS " + amount.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    }
+
+    function escapeHtml(value) {
+        return String(value ?? "").replace(/[&<>"']/g, character => ({
+            "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;"
+        })[character]);
+    }
+
+    function unescapeHtml(value) {
+        const element = document.createElement("div");
+        element.innerHTML = value;
+        return element.textContent || "";
+    }
+
+    async function readJsonResponse(response) {
+        try {
+            return await response.json();
+        } catch (error) {
+            return { error: `The server returned an invalid response (${response.status}).` };
+        }
+    }
+
+    function showToast(message, variant = "success") {
+        const toastElement = document.getElementById("toast");
+        const toastBody = document.getElementById("toast-body");
+
+        if (!toastElement || !toastBody) {
+            console.log(message);
+            return;
+        }
+
+        toastBody.textContent = message;
+
+        toastElement.classList.remove("text-bg-success", "text-bg-danger", "text-bg-warning", "text-bg-info");
+        toastElement.classList.add(`text-bg-${variant}`);
+
+        if (window.bootstrap) {
+            bootstrap.Toast.getOrCreateInstance(toastElement, { delay: 4000 }).show();
+        }
+    }
+
+    /* ============================================================
+       PRODUCT SEARCH
+    ============================================================ */
+
+    searchForm.addEventListener("submit", async function (event) {
+        event.preventDefault();
+
+        const query = String(searchInput.value || "").trim();
+        const quantity = Math.max(1, parseInt(searchQty.value || "1", 10));
+
+        if (!query) {
+            searchInput.focus();
+            return;
+        }
+
+        resultBody.innerHTML = `
+            <tr><td colspan="3" class="text-center text-muted py-3">Searching...</td></tr>
+        `;
+
+        try {
+            const url = `/api/products/?search=${encodeURIComponent(query)}&page_size=10&ordering=name`;
+
+            const response = await fetch(url, {
+                credentials: "same-origin",
+                headers: { "X-Requested-With": "XMLHttpRequest" }
+            });
+
+            const data = await readJsonResponse(response);
+
+            if (!response.ok) {
+                throw new Error(data.error || data.detail || "Product search failed.");
+            }
+
+            const rows = Array.isArray(data) ? data : Array.isArray(data.results) ? data.results : [];
+
+            if (!rows.length) {
+                resultBody.innerHTML = `
+                    <tr><td colspan="3" class="text-center text-muted py-3">No products found.</td></tr>
+                `;
+                return;
+            }
+
+            renderResults(rows, quantity);
+
+        } catch (error) {
+            console.error(error);
+
+            resultBody.innerHTML = `
+                <tr><td colspan="3" class="text-center text-danger py-3">${escapeHtml(error.message || "Search failed.")}</td></tr>
+            `;
+
+            showToast(error.message || "Search failed", "danger");
+        }
+    });
+
+    clearSearchBtn.addEventListener("click", function () {
+        searchInput.value = "";
+        searchQty.value = "1";
+
+        resultBody.innerHTML = `
+            <tr><td colspan="3" class="text-center text-muted py-3">Search to see results...</td></tr>
+        `;
+
+        searchInput.focus();
+    });
+
+    function renderResults(rows, defaultQuantity) {
+        resultBody.innerHTML = rows.map(product => {
+            const productName = escapeHtml(product.name || "");
+            const productSku = escapeHtml(product.sku || "");
+
+            return `
+                <tr>
+                    <td>${productSku}</td>
+                    <td style="max-width:280px" class="text-truncate">${productName}</td>
+                    <td class="text-end">
+                        <button type="button" class="btn btn-sm btn-outline-primary"
+                            data-add="${Number(product.id)}"
+                            data-qty="${Number(defaultQuantity)}"
+                            data-sku="${productSku}"
+                            data-name="${productName}">
+                            <i class="bi bi-plus"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join("");
+
+        resultBody.querySelectorAll("button[data-add]").forEach(button => {
+            button.addEventListener("click", async function () {
+                const productId = Number(button.dataset.add);
+
+                let lastPrice = 0;
+
+                try {
+                    const response = await fetch(`/api/products/${productId}/last-price/`, {
+                        credentials: "same-origin",
+                        headers: { "X-Requested-With": "XMLHttpRequest" }
+                    });
+
+                    const data = await readJsonResponse(response);
+
+                    if (response.ok) {
+                        lastPrice = Number(data.last_price || 0);
+                    }
+                } catch (error) {
+                    console.error(error);
+                }
+
+                addToQuote({
+                    product_id: productId,
+                    sku: button.dataset.sku,
+                    name: unescapeHtml(button.dataset.name),
+                    unit_price: lastPrice,
+                    qty: Number(button.dataset.qty)
+                });
+            });
+        });
+    }
+
+    /* ============================================================
+       QUOTE
+    ============================================================ */
+
+    function addToQuote(item) {
+        const existingItem = quote.find(quoteItem => quoteItem.product_id === item.product_id);
+
+        if (existingItem) {
+            existingItem.qty = Number(existingItem.qty) + Number(item.qty);
+        } else {
+            quote.push(item);
+        }
+
+        renderQuote();
+    }
+
+    function removeFromQuote(productId) {
+        quote = quote.filter(item => item.product_id !== productId);
+        renderQuote();
+    }
+
+    function updatePrice(productId, rawPrice) {
+        const item = quote.find(quoteItem => quoteItem.product_id === productId);
+        if (!item) return;
+
+        const price = Number(rawPrice);
+
+        if (!Number.isFinite(price) || price < 0) {
+            showToast("Enter a valid price.", "warning");
+            renderQuote();
+            return;
+        }
+
+        item.unit_price = price;
+        renderQuote();
+    }
+
+    function updateQuantity(productId, rawQuantity) {
+        const item = quote.find(quoteItem => quoteItem.product_id === productId);
+        if (!item) return;
+
+        item.qty = Math.max(1, parseInt(rawQuantity || "1", 10));
+        renderQuote();
+    }
+
+    function renderQuote() {
+        if (!quote.length) {
+            quoteBody.innerHTML = `
+                <tr><td colspan="5" class="text-center text-muted py-3">No items yet</td></tr>
+            `;
+            quoteCount.textContent = "0 items";
+            grandText.textContent = money(0);
+            return;
+        }
+
+        quoteBody.innerHTML = quote.map(item => {
+            const lineTotal = Number(item.unit_price) * Number(item.qty);
+
+            return `
+                <tr>
+                    <td>
+                        <div class="fw-semibold">${escapeHtml(item.sku)}</div>
+                        <div class="small text-muted text-truncate">${escapeHtml(item.name)}</div>
+                    </td>
+
+                    <td class="text-end">
+                        <input type="number" class="form-control form-control-sm text-end"
+                            value="${Number(item.unit_price).toFixed(2)}" min="0" step="0.01"
+                            data-price-for="${item.product_id}">
+                    </td>
+
+                    <td class="text-end">
+                        <input type="number" class="form-control form-control-sm text-end"
+                            value="${Number(item.qty)}" min="1" step="1"
+                            data-qty-for="${item.product_id}">
+                    </td>
+
+                    <td class="text-end">${money(lineTotal)}</td>
+
+                    <td class="text-end">
+                        <button type="button" class="btn btn-sm btn-outline-danger" data-remove="${item.product_id}">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join("");
+
+        const totalUnits = quote.reduce((total, item) => total + Number(item.qty), 0);
+        quoteCount.textContent = `${totalUnits} item${totalUnits === 1 ? "" : "s"}`;
+
+        const grand = quote.reduce((sum, item) => sum + Number(item.unit_price) * Number(item.qty), 0);
+        grandText.textContent = money(grand);
+
+        quoteBody.querySelectorAll("input[data-price-for]").forEach(input => {
+            input.addEventListener("change", function () {
+                updatePrice(Number(input.dataset.priceFor), input.value);
+            });
+        });
+
+        quoteBody.querySelectorAll("input[data-qty-for]").forEach(input => {
+            input.addEventListener("change", function () {
+                updateQuantity(Number(input.dataset.qtyFor), input.value);
+            });
+        });
+
+        quoteBody.querySelectorAll("button[data-remove]").forEach(button => {
+            button.addEventListener("click", function () {
+                removeFromQuote(Number(button.dataset.remove));
+            });
+        });
+    }
+
+    clearQuoteBtn.addEventListener("click", function () {
+        quote = [];
+        renderQuote();
+    });
+
+    /* ============================================================
+       DOWNLOAD PDF
+    ============================================================ */
+
+    downloadBtn.addEventListener("click", async function () {
+        if (!quote.length) {
+            showToast("Add at least one item to the quote.", "warning");
+            return;
+        }
+
+        downloadBtn.disabled = true;
+        downloadBtn.innerHTML = `
+            <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+            Generating...
+        `;
+
+        try {
+            const response = await fetch("{% url 'accounts:sales-quote-pdf' %}", {
+                method: "POST",
+                credentials: "same-origin",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": csrftoken(),
+                    "X-Requested-With": "XMLHttpRequest"
+                },
+                body: JSON.stringify({
+                    customer_name: customerName.value.trim(),
+                    items: quote.map(item => ({
+                        sku: item.sku,
+                        name: item.name,
+                        qty: item.qty,
+                        unit_price: item.unit_price
+                    }))
+                })
+            });
+
+            if (!response.ok) {
+                const data = await readJsonResponse(response);
+                throw new Error(data.error || "Failed to generate the quote.");
+            }
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = "sales-quote.pdf";
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+
+            window.URL.revokeObjectURL(url);
+
+            showToast("Quote downloaded successfully.");
+
+        } catch (error) {
+            console.error(error);
+            showToast(error.message || "Failed to generate the quote.", "danger");
+
+        } finally {
+            downloadBtn.disabled = false;
+            downloadBtn.innerHTML = `
+                <i class="bi bi-file-earmark-pdf me-1"></i> Download PDF Quote
+            `;
+        }
+    });
+
+    renderQuote();
+});
+</script>
+
+{% endblock %}

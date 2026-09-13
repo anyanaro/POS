@@ -1,0 +1,221 @@
+{% extends "accounts/base.html" %}
+
+{% block dashboard_content %}
+
+<div class="card shadow-sm">
+
+    <div class="card-header">
+
+        <h4>
+
+            <i class="bi bi-box-seam me-2 text-success"></i>
+
+            Receive Goods
+
+        </h4>
+
+    </div>
+
+    <div class="card-body">
+
+        <form method="post">
+
+            {% csrf_token %}
+
+            <div class="row g-3 mb-4">
+                <div class="col-md-5">
+                    <label class="form-label">Receive mode</label>
+                    <select name="receipt_mode" class="form-select" id="receipt-mode">
+                        <option value="CONSOLIDATED_BRANCH">Receive at one selected branch</option>
+                        <option value="ORIGINAL_BRANCHES">Allocate to original requisition branches</option>
+                    </select>
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label">Receiving branch</label>
+                    <select name="destination_branch" class="form-select" id="destination-branch">
+                        {% for branch in branches %}
+                            <option value="{{ branch.id }}" {% if branch.id == receiving_branch_id %}selected{% endif %}>
+                                {{ branch.name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text">In original-branch mode, select the branch posting this GRN. In consolidated mode, select the central receiving branch.</div>
+                </div>
+            </div>
+
+            <table class="table table-bordered">
+
+                <thead>
+
+                    <tr>
+
+                        <th>Product</th>
+                        <th>Ordered Qty</th>
+                        <th>Remaining Qty</th>
+                        <th>Received Qty</th>
+                        <th>Original Branch Allocations</th>
+                        <th>Batch No</th>
+                        <th>Expiry Date</th>
+
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                    {% for line in order.lines.all %}
+
+                    <tr>
+
+                        <td>{{ line.product }}</td>
+                    
+                        <td>{{ line.qty|floatformat:2 }}</td>
+
+                        <td>
+                            <span class="remaining-qty">{{ line.remaining_qty|floatformat:2 }}</span>
+                            <small class="text-muted d-block">
+                                Received: {{ line.received_to_date|floatformat:2 }}
+                            </small>
+                        </td>
+                    
+                        <td>
+                    
+                            <input
+                                type="number"
+                                step="0.0001"
+                                name="received_{{ line.id }}"
+                                class="form-control"
+                                value="0"
+                                step="0.0001"
+                                min="0"
+                                max="{{ line.remaining_qty }}"
+                                data-line-id="{{ line.id }}"
+                                {% if line.remaining_qty <= 0 %}disabled{% endif %}>
+                    
+                        </td>
+
+                        <td>
+                            {% if line.consolidated_line %}
+                                {% for allocation in line.consolidated_line.allocations.all %}
+                                    <div class="allocation-row input-group input-group-sm mb-1" data-branch-id="{{ allocation.requisition.branch_id }}">
+                                        <span class="input-group-text">{{ allocation.requisition.branch }}</span>
+                                        <input type="number"
+                                               step="0.0001"
+                                               min="0"
+                                               max="{{ allocation.remaining_qty }}"
+                                               name="allocation_{{ allocation.id }}"
+                                               class="form-control"
+                                               value="0"
+                                               data-allocation-input="{{ allocation.id }}"
+                                               {% if allocation.remaining_qty <= 0 or line.remaining_qty <= 0 %}disabled{% endif %}>
+                                    </div>
+                                    <small class="text-muted d-block mb-2">
+                                        Remaining: {{ allocation.remaining_qty|floatformat:2 }}
+                                    </small>
+                                {% empty %}
+                                    <span class="text-muted">No origin allocation</span>
+                                {% endfor %}
+                            {% else %}
+                                <span class="text-muted">Direct purchase</span>
+                            {% endif %}
+                        </td>
+                    
+                        <td>
+                    
+                            <input
+                                type="text"
+                                name="batch_{{ line.id }}"
+                                class="form-control"
+                                data-batch-input="{{ line.id }}"
+                                {% if line.remaining_qty <= 0 %}disabled{% endif %}>
+                    
+                        </td>
+                    
+                        <td>
+                    
+                            <input
+                                type="date"
+                                name="expiry_{{ line.id }}"
+                                class="form-control"
+                                {% if line.remaining_qty <= 0 %}disabled{% endif %}>
+                    
+                        </td>
+                    
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+            <button
+                class="btn btn-success">
+
+                <i class="bi bi-check-circle me-1"></i>
+
+                Create GRN
+
+            </button>
+
+        </form>
+
+    </div>
+
+</div>
+
+<script>
+document.querySelector('form').addEventListener('submit', function (event) {
+    let valid = true;
+
+    document.querySelectorAll('input[name^="received_"]').forEach(function (quantityInput) {
+        const quantity = Number(quantityInput.value || 0);
+        const lineId = quantityInput.dataset.lineId;
+        const batchInput = document.querySelector(`[data-batch-input="${lineId}"]`);
+
+        if (quantity > 0 && batchInput && !batchInput.value.trim()) {
+            batchInput.required = true;
+            batchInput.focus();
+            valid = false;
+        } else if (batchInput) {
+            batchInput.required = false;
+        }
+    });
+
+    if (!valid) {
+        event.preventDefault();
+        alert('Enter a batch number only for items being received now.');
+    }
+});
+
+(function () {
+    const receiptMode = document.getElementById('receipt-mode');
+    const destinationBranch = document.getElementById('destination-branch');
+
+    function refreshAllocationInputs() {
+        const originalBranchMode = receiptMode.value === 'ORIGINAL_BRANCHES';
+        document.querySelectorAll('.allocation-row').forEach(function (row) {
+            const belongsToReceivingBranch = row.dataset.branchId === destinationBranch.value;
+            row.classList.toggle('d-none', originalBranchMode && !belongsToReceivingBranch);
+            row.querySelector('input').disabled = originalBranchMode && !belongsToReceivingBranch;
+        });
+
+        document.querySelectorAll('input[name^="received_"]').forEach(function (receivedInput) {
+            if (!originalBranchMode) return;
+            const row = receivedInput.closest('tr');
+            const total = Array.from(row.querySelectorAll('.allocation-row:not(.d-none) input'))
+                .reduce(function (sum, input) { return sum + Number(input.value || 0); }, 0);
+            receivedInput.value = total || 0;
+        });
+    }
+
+    document.querySelectorAll('[data-allocation-input]').forEach(function (input) {
+        input.addEventListener('input', refreshAllocationInputs);
+    });
+    receiptMode.addEventListener('change', refreshAllocationInputs);
+    destinationBranch.addEventListener('change', refreshAllocationInputs);
+    refreshAllocationInputs();
+})();
+</script>
+
+{% endblock %}

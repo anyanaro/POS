@@ -1,0 +1,223 @@
+{% extends "accounts/base.html" %}
+{% block dashboard_content %}
+
+<h4 class="mb-3">{{ mode|title }} Product</h4>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <form id="product-form" class="row g-3" enctype="multipart/form-data">
+      {% csrf_token %}
+
+      <div class="col-md-3">
+        <label class="form-label"> SKU <span class="text-muted small">(auto-generated)</span> </label>
+        <input class="form-control" id="sku" value="{{ product.sku|default:'' }}" readonly>
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label">BC Number<span class="text-danger">*</span></label>
+        <input class="form-control" id="bc_number" value="{{ product.bc_number|default:'' }}" required>
+      </div>
+
+      <div class="col-md-5">
+        <label class="form-label">Name<span class="text-danger">*</span></label>
+        <input class="form-control" id="name" value="{{ product.name|default:'' }}" required>
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label">Barcode</label>
+        <input class="form-control" id="barcode" value="{{ product.barcode|default_if_none:'' }}">
+      </div>
+
+      <div class="col-sm-6 col-md-3">
+        <label class="form-label">Buying Cost<span class="text-danger">*</span></label>
+        <input type="number" min="0" step="0.0001" class="form-control" id="buying_cost" value="{{ product.buying_cost|default_if_none:'' }}" required>
+      </div>
+
+      <div class="col-sm-6 col-md-3">
+        <label class="form-label">Unit Price<span class="text-danger">*</span></label>
+        <input type="number" min="0" step="0.0001" class="form-control" id="unit_price" value="{{ product.unit_price|default_if_none:'' }}" required>
+      </div>
+
+      <div class="col-sm-6 col-md-2">
+        <label class="form-label">Min Margin %</label>
+        <input type="number" min="0" step="0.01" class="form-control" id="min_margin_pct" value="{{ product.min_margin_pct|default_if_none:'0.00' }}">
+      </div>
+
+      <div class="col-sm-6 col-md-2">
+        <label class="form-label">Max Margin %</label>
+        <input type="number" min="0" step="0.01" class="form-control" id="max_margin_pct" value="{{ product.max_margin_pct|default_if_none:'100.00' }}">
+      </div>
+
+      <div class="col-sm-6 col-md-2">
+        <label class="form-label">Tax Rate %</label>
+        <input type="number" min="0" step="0.01" class="form-control" id="tax_rate" value="{{ product.tax_rate|default_if_none:'0.00' }}">
+      </div>
+
+      <div class="col-sm-6 col-md-3">
+        <label class="form-label">Re-order Level</label>
+        <input type="number" min="0" step="0.0001" class="form-control" id="reorder_level" value="{{ product.reorder_level|default_if_none:'0' }}">
+      </div>
+
+      <div class="col-sm-6 col-md-3">
+        <label class="form-label">Suggested Re-order Quantity</label>
+        <input type="number" min="0" step="0.0001" class="form-control" id="reorder_qty" value="{{ product.reorder_qty|default_if_none:'0' }}">
+      </div>
+
+      <!-- SUPPLIER DROPDOWN — FIXED -->
+      <div class="col-sm-6 col-md-4">
+        <label class="form-label">Supplier</label>
+        <select id="supplier" name="supplier" class="form-select">
+          <option value="">— None —</option>
+          {% for s in suppliers %}
+            <option value="{{ s.id }}" {% if product.supplier_id == s.id %}selected{% endif %}>
+              {{ s.name }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label">Image</label>
+        <input type="file" id="image" class="form-control" accept="image/*">
+      </div>
+
+      <div class="col-md-4 d-flex align-items-end">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="active" {% if product.active %}checked{% endif %}>
+          <label class="form-check-label" for="active">Active</label>
+        </div>
+      </div>
+
+      <div class="col-12">
+        <div id="form-errors" class="text-danger small"></div>
+      </div>
+
+      <div class="col-12 d-flex gap-2">
+        <button class="btn btn-primary" type="submit">
+          <i class="bi bi-save me-1"></i> {{ mode|title }}
+        </button>
+        <a href="{% url 'accounts:products' %}" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1080">
+  <div id="toast" class="toast align-items-center text-bg-danger border-0" role="alert">
+    <div class="d-flex">
+      <div id="toast-body" class="toast-body">Error</div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+    const form = document.getElementById('product-form');
+    const errorsEl = document.getElementById('form-errors');
+    const apiUrl = "{{ api_url }}";
+    const mode = "{{ mode }}";
+
+    function getCSRF() {
+      const m = document.cookie.match(/csrftoken=([^;]+)/);
+      return m ? m[1] : '';
+    }
+
+    function renderErrors(err){
+      if (!err){ errorsEl.textContent=""; return; }
+      if (typeof err === 'string'){ errorsEl.textContent = err; showToast(err); return; }
+      if (err.detail){ errorsEl.textContent = err.detail; showToast(err.detail); return; }
+
+      const parts = [];
+      for (const k in err){
+        parts.push(`${k}: ${Array.isArray(err[k]) ? err[k].join(', ') : err[k]}`);
+      }
+      const txt = parts.join(' • ') || 'Unknown error';
+      errorsEl.textContent = txt;
+      showToast(txt);
+    }
+
+    function validateClient(){
+      const bc = parseFloat(document.getElementById('buying_cost').value || '0');
+      const up = parseFloat(document.getElementById('unit_price').value || '0');
+      const minm = parseFloat(document.getElementById('min_margin_pct').value || '0');
+      const maxm = parseFloat(document.getElementById('max_margin_pct').value || '100');
+      if (up < bc) return "Unit price cannot be lower than buying cost.";
+      if (minm > maxm) return "Min margin % cannot exceed Max margin %.";
+      if (!document.getElementById('bc_number').value.trim()) return "BC Number is required.";
+      return null;
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const clientErr = validateClient();
+      if (clientErr){ renderErrors(clientErr); return; }
+
+      const fd = new FormData();
+
+      const skuVal = (document.getElementById('sku').value || '').trim();
+      if (skuVal) fd.append("sku", skuVal);
+
+      fd.append("name", document.getElementById('name').value.trim());
+      fd.append("bc_number", document.getElementById('bc_number').value.trim());
+      fd.append("barcode", document.getElementById('barcode').value.trim());
+      fd.append("buying_cost", document.getElementById('buying_cost').value);
+      fd.append("unit_price", document.getElementById('unit_price').value);
+      fd.append("min_margin_pct", document.getElementById('min_margin_pct').value);
+      fd.append("max_margin_pct", document.getElementById('max_margin_pct').value);
+      fd.append("tax_rate", document.getElementById('tax_rate').value);
+      fd.append("reorder_level", document.getElementById('reorder_level').value || '0');
+      fd.append("reorder_qty", document.getElementById('reorder_qty').value || '0');
+
+      const supVal = document.getElementById('supplier').value;
+      fd.append("supplier", supVal ? supVal : "");
+
+      fd.append("active", document.getElementById('active').checked ? 'true' : 'false');
+      
+      const img = document.getElementById('image').files[0];
+      if (img) fd.append("image", img);
+
+      const method = (mode === 'edit') ? 'PUT' : 'POST';
+
+      try {
+        const resp = await fetch(apiUrl, {
+          method,
+          headers: {
+            'X-CSRFToken': getCSRF(),
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          body: fd,
+          credentials: 'same-origin'
+        });
+
+        let data = null;
+        if (resp.headers.get("content-type")?.includes("application/json")) {
+          data = await resp.json();
+        }
+
+        if (!resp.ok){
+          renderErrors(data || `Request failed (${resp.status})`);
+          return;
+        }
+
+        window.location.href = "{% url 'accounts:products' %}?toast=" + (mode === 'edit' ? "updated" : "created");
+
+      } catch (err){
+        console.error(err);
+        renderErrors("Network error. Please try again.");
+      }
+    });
+
+    function showToast(message){
+      const toastEl = document.getElementById('toast');
+      const body = document.getElementById('toast-body');
+      body.textContent = message;
+      new bootstrap.Toast(toastEl, { delay: 2500 }).show();
+    }
+
+})();
+</script>
+
+{% endblock %}

@@ -1,0 +1,47 @@
+{% extends "accounts/base.html" %}
+{% block dashboard_content %}
+
+<h3>
+<i class="bi bi-arrow-counterclockwise text-danger me-2"></i>
+Returns
+</h3>
+
+<div class="card shadow-sm">
+
+<div class="card-body">
+
+<form class="row g-3">
+
+<div class="col-md-6">
+<label class="form-label">
+Sale Reference
+</label>
+
+<input class="form-control">
+</div>
+
+<div class="col-md-6">
+<label class="form-label">
+Reason
+</label>
+
+<input class="form-control">
+</div>
+
+<div class="col-12">
+<button class="btn btn-danger">
+
+<i class="bi bi-arrow-counterclockwise me-1"></i>
+
+Process Return
+
+</button>
+</div>
+
+</form>
+
+</div>
+
+</div>
+
+{% endblock %}

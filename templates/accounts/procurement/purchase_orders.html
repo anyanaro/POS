@@ -1,0 +1,99 @@
+{% extends "accounts/base.html" %}
+{% block dashboard_content %}
+{% load humanize %}
+
+<h3 class="mb-3">
+    <i class="bi bi-file-earmark-check text-success me-2"></i>
+    Purchase Orders
+</h3>
+
+<div class="card shadow-sm">
+    <div class="card-body table-responsive">
+
+        <table class="erp-table"
+    id="purchaseOrdersTable"
+    class="table table-striped erp-table align-middle">
+
+            <thead class="table-light">
+                <tr>
+                    <th>PO No</th>
+                    <th>Supplier</th>
+                    <th>Date</th>
+                    <th class="text-end">Total</th>
+                    <th>Status</th>
+                    <th class="text-end no-sort">Actions</th>
+                </tr>
+            </thead>
+        
+            <tbody>
+        
+                {% for order in orders %}
+        
+                <tr>
+        
+                    <td>
+        
+                        PUR-{{ order.purchase_id|stringformat:"s"|slice:":8" }}
+        
+                    </td>
+        
+                    <td>
+        
+                        {{ order.supplier }}
+        
+                    </td>
+        
+
+                    <td data-order="{{ order.created_at|date:'YmdHis' }}">
+                        {{ order.created_at }}
+                    </td>
+                    
+        
+                    <td
+                        class="text-end"
+                        data-order="{{ order.total }}"
+                    >
+                        {{ order.total|floatformat:2|intcomma }}
+                    </td>
+        
+                    <td data-order="{{ order.status }}">
+
+                        <span class="badge bg-primary">
+                            {{ order.status }}
+                        </span>
+                    
+                    </td>
+        
+                    <td class="text-end">
+        
+                        <a href="{% url 'accounts:purchase-order-detail' order.id %}" class="btn btn-sm btn-outline-info">
+                           
+        
+                            <i class="bi bi-eye"></i>
+        
+                            View
+        
+                        </a>
+        
+                        <a href="{% url 'accounts:purchase-order-pdf' order.id %}" class="btn btn-sm btn-outline-success">
+        
+                            <i class="bi bi-file-earmark-pdf"></i>
+        
+                            PDF
+        
+                        </a>
+        
+                    </td>
+        
+                </tr>
+        
+                {% endfor %}
+        
+            </tbody>
+        
+        </table>
+
+    </div>
+</div>
+
+{% endblock %}

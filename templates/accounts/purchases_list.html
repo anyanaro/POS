@@ -1,0 +1,96 @@
+{% extends "accounts/base.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block dashboard_content %}
+<div class="container-xxl">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">Purchases</h3>
+    <a href="{% url 'accounts:products' %}" class="btn btn-outline-primary d-none d-sm-inline">
+      <i class="bi bi-box-seam me-1"></i> Products
+    </a>
+  </div>
+
+  <div class="d-flex justify-content-between align-items-center mb-3">
+   
+    <a href="{% url 'accounts:purchase-new' %}" class="btn btn-primary">
+        <i class="bi bi-plus-circle me-1"></i> New Purchase
+    </a>
+</div>
+
+
+  <!-- Filters -->
+  <form class="row g-2 mb-3" method="get">
+    <div class="col-md-2">
+      <input type="date" class="form-control" name="from" value="{{ from }}">
+    </div>
+    <div class="col-md-2">
+      <input type="date" class="form-control" name="to" value="{{ to }}">
+    </div>
+    <div class="col-md-3">
+      <select name="supplier" class="form-select">
+        <option value="">All suppliers</option>
+        {% for s in suppliers %}
+          <option value="{{ s.id }}" {% if supplier_id|add:'' == s.id|add:'' %}selected{% endif %}>
+            {{ s.name }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3">
+      <input type="text" class="form-control" name="q" value="{{ q }}" placeholder="Search reference / supplier / id">
+    </div>
+    <div class="col-md-2 d-grid">
+      <button class="btn btn-primary"><i class="bi bi-funnel me-1"></i>Filter</button>
+    </div>
+  </form>
+
+
+  <!-- Table -->
+  <div class="card">
+    <div class="card-body">
+      <div class="table-responsive">
+        <table id="purchasesTable" class="table table-sm align-middle table-hover erp-table w-100">
+          <thead class="table-light">
+            <tr>
+              <th>Date</th>
+              <th>Purchase</th>
+              <th>Supplier</th>
+              <th>Reference</th>
+              <th class="text-end">Total</th>
+              <th class="text-end">—</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for h in purchases %}
+              <tr>
+                <td data-order="{{ h.purchase_date|date:'Ymd' }}">
+                  {{ h.purchase_date }}
+              </td>
+                <td class="text-monospace">
+                  <a class="text-decoration-none" href="{% url 'accounts:purchase-detail' h.purchase_id %}">
+                    PUR-{{ h.purchase_id|slice:":8" }}
+                  </a>
+                </td>
+                <td>{{ h.supplier.name|default:"-" }}</td>
+                <td class="text-truncate" style="max-width:260px">{{ h.reference|default:"-" }}</td>
+                <td class="text-end" data-order="{{ h.total }}"> {{ h.total|floatformat:2|intcomma }}</td>
+                <td class="text-end">
+                  <a class="btn btn-outline-secondary btn-sm" href="{% url 'accounts:purchase-detail' h.purchase_id %}">
+                    <i class="bi bi-receipt me-1"></i>View
+                  </a>
+                </td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="6" class="text-center text-muted py-3">No purchases</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+   
+
+    </div>
+  </div>
+</div>
+{% endblock %}

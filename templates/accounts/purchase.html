@@ -1,0 +1,487 @@
+{% extends "accounts/base.html" %}
+{% load static branch_tags %}
+
+{% block dashboard_content %}
+
+<div class="container-xxl">
+
+  <!-- Page Header -->
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <div>
+      <h3 class="mb-1">New Purchase</h3>
+      <div class="text-muted small">
+        {% if request.session.active_branch_id %}
+          <i class="bi bi-shop-window me-1"></i>
+          Branch:
+          <span class="fw-semibold">{{ request.session.active_branch_id|branch_name }}</span>
+        {% else %}
+          <span class="text-danger">No active branch selected</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="d-flex gap-2">
+      <button id="btn-clear" class="btn btn-outline-secondary">
+        <i class="bi bi-x-circle me-1"></i>Clear
+      </button>
+      <button id="btn-submit" class="btn btn-success">
+        <i class="bi bi-check2-circle me-1"></i>Submit Purchase
+      </button>
+    </div>
+  </div>
+
+  <!-- Supplier / Reference (optional) -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-4">
+      <label class="form-label">Supplier</label>
+     <select id="supplier_id" class="form-select">
+    <option value="">-- Select Supplier --</option>
+    {% for s in suppliers %}
+        <option value="{{ s.id }}">{{ s.name }}</option>
+    {% endfor %}
+</select>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Invoice / Reference (optional)</label>
+      <input id="reference" type="text" class="form-control" placeholder="Invoice # or Note">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Purchase Date</label>
+      <input id="purch-date" type="date" class="form-control" value="{{ now|date:'Y-m-d' }}">
+    </div>
+  </div>
+
+  <!-- Search -->
+  <div class="card mb-4">
+    <div class="card-header">
+      <div class="d-flex align-items-center gap-2">
+        <i class="bi bi-search"></i>
+        <span class="fw-semibold">Find products to add</span>
+      </div>
+    </div>
+    <div class="card-body">
+      <form id="search-form" class="row g-2">
+        <div class="col-md-6">
+          <input id="search-input" type="text" class="form-control" placeholder="Search by name or SKU…" autocomplete="off">
+        </div>
+        <div class="col-md-2">
+          <input id="search-qty" type="number" class="form-control" min="1" step="1" value="1" title="Default Qty">
+        </div>
+        <div class="col-md-2">
+          <button type="submit" class="btn btn-primary w-100">
+            <i class="bi bi-search me-1"></i>Search
+          </button>
+        </div>
+        <div class="col-md-2">
+          <button id="clear-search" type="button" class="btn btn-outline-secondary w-100">Clear</button>
+        </div>
+      </form>
+
+      <div class="table-responsive mt-3">
+        <table class="table table-sm align-middle">
+          <thead class="table-light">
+            <tr>
+              <th style="width:140px">SKU</th>
+              <th>Name</th>
+              <th class="text-end" style="width:140px">—</th>
+            </tr>
+          </thead>
+          <tbody id="result-body">
+            <tr>
+              <td colspan="3" class="text-center text-muted py-3">Search to see results…</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Purchase Lines -->
+  <div class="card mb-4">
+    <div class="card-header d-flex align-items-center justify-content-between">
+      <div class="d-flex align-items-center gap-2">
+        <i class="bi bi-clipboard2-plus"></i>
+        <span class="fw-semibold">Items for Purchase Order</span>
+      </div>
+      <span id="line-count" class="badge bg-secondary">0 items</span>
+    </div>
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>SKU / Name</th>
+              <th class="text-end" style="width:180px">Qty</th>
+              <th class="text-end" style="width:180px">Unit Cost</th>
+              <th class="text-end" style="width:180px">Line Total</th>
+              <th class="text-end" style="width:90px"></th>
+            </tr>
+          </thead>
+          <tbody id="lines-body">
+            <tr>
+              <td colspan="5" class="text-center text-muted py-3">No items yet</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr>
+              <th colspan="3" class="text-end">Grand Total</th>
+              <th class="text-end">KES <span id="subtotal-text">0.00</span></th>
+              <th></th>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Minimal toast (page-local) -->
+  <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1080">
+    <div id="toast" class="toast align-items-center text-bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+      <div class="d-flex">
+        <div id="toast-body" class="toast-body">Saved</div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Success modal -->
+<div class="modal fade" id="purchaseReceiptModal" tabindex="-1" aria-labelledby="purchaseReceiptLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 id="purchaseReceiptLabel" class="modal-title">Purchase Saved</h5>
+        <button class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-2">
+          <div class="text-muted small">Reference</div>
+          <div id="rec-ref" class="fw-semibold">—</div>
+        </div>
+        <div class="mb-2">
+          <div class="text-muted small">Total</div>
+          <div id="rec-total" class="fw-semibold">—</div>
+        </div>
+        <div class="text-muted small">Tip: Check inventory report to verify updated stock.</div>
+      </div>
+      <div class="modal-footer">
+        <a href="{% url 'accounts:inventory' %}" class="btn btn-outline-secondary">
+          <i class="bi bi-archive me-1"></i> Inventory
+        </a>
+        <button class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Page Script -->
+<script>
+(function(){
+  // Elements
+  const searchForm   = document.getElementById('search-form');
+  const searchInput  = document.getElementById('search-input');
+  const searchQty    = document.getElementById('search-qty');
+  const clearSearch  = document.getElementById('clear-search');
+  const resultBody   = document.getElementById('result-body');
+
+  const linesBody    = document.getElementById('lines-body');
+  const lineCount    = document.getElementById('line-count');
+  const subtotalText = document.getElementById('subtotal-text');
+
+  const supplierInp  = document.getElementById('supplier_id');
+  const referenceInp = document.getElementById('reference');
+  const dateInp      = document.getElementById('purch-date');
+
+  const btnClear     = document.getElementById('btn-clear');
+  const btnSubmit    = document.getElementById('btn-submit');
+
+  // Bootstrap modals (init after DOM ready)
+  let receiptModal = null;
+  document.addEventListener('DOMContentLoaded', () => {
+    const el = document.getElementById('purchaseReceiptModal');
+    if (window.bootstrap && el) {
+      receiptModal = new bootstrap.Modal(el);
+    }
+  });
+
+  // State: purchase lines
+  // item: {product_id, sku, name, qty, cost, batch_no, expiry (YYYY-MM-DD|null)}
+  let items = [];
+
+  // Utils
+  function getCookie(name){
+    const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+    return m ? m.pop() : '';
+  }
+  function money(v){
+    const n = Number(v || 0);
+    return n.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  }
+  function todayISO(){
+    const d = new Date();
+    const m = String(d.getMonth()+1).padStart(2,'0');
+    const day = String(d.getDate()).padStart(2,'0');
+    return `${d.getFullYear()}-${m}-${day}`;
+  }
+
+  // ---------- Search ----------
+  searchForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const q = (searchInput.value || '').trim();
+    const qtyDefault = Math.max(1, parseInt(searchQty.value || '1', 10));
+    if (!q) return;
+
+    try{
+      const url = `/api/products/?search=${encodeURIComponent(q)}&page_size=10&ordering=name`;
+      const resp = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' }});
+      const data = await resp.json();
+      const rows = Array.isArray(data) ? data : (data.results || []);
+      if (!rows.length){
+        resultBody.innerHTML = `<tr><td colspan="3" class="text-center text-muted py-3">No results</td></tr>`;
+        return;
+      }
+      renderResults(rows, qtyDefault);
+    }catch(err){
+      console.error(err);
+      resultBody.innerHTML = `<tr><td colspan="3" class="text-center text-danger py-3">Search failed</td></tr>`;
+      showToast('Search failed', 'danger');
+    }
+  });
+
+  clearSearch.addEventListener('click', () => {
+    searchInput.value = '';
+    resultBody.innerHTML = `<tr><td colspan="3" class="text-center text-muted py-3">Search to see results…</td></tr>`;
+  });
+
+  function renderResults(rows, qtyDefault){
+    resultBody.innerHTML = rows.map(r => `
+      <tr>
+        <td class="text-monospace">${r.sku || ''}</td>
+        <td class="text-truncate" style="max-width:380px">${r.name || ''}</td>
+        <td class="text-end">
+          <button class="btn btn-sm btn-outline-primary" data-add="${r.id}" data-sku="${r.sku||''}" data-name="${(r.name||'').replace(/"/g,'&quot;')}" data-qty="${qtyDefault}">
+            <i class="bi bi-plus"></i>
+          </button>
+        </td>
+      </tr>
+    `).join('');
+
+    resultBody.querySelectorAll('button[data-add]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const product_id = Number(btn.dataset.add);
+        const sku  = btn.dataset.sku || '';
+        const name = btn.dataset.name || '';
+        const qty  = Number(btn.dataset.qty || 1);
+
+        addLine({
+          product_id, sku, name,
+          qty: qty,
+          cost: 0,
+          batch_no: '',
+          expiry: '' // optional
+        });
+      });
+    });
+  }
+
+  // ---------- Lines ----------
+  function addLine(item){
+    // If product already exists in list, just bump qty
+    const idx = items.findIndex(x => x.product_id === item.product_id && x.batch_no === '');
+    if (idx >= 0){
+      items[idx].qty += item.qty;
+    } else {
+      items.push(item);
+    }
+    renderLines();
+  }
+
+  function removeLine(product_id, rowIndex){
+    items.splice(rowIndex, 1);
+    renderLines();
+  }
+
+  function renderLines(){
+    if (!items.length){
+      linesBody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-3">No items yet</td></tr>`;
+      lineCount.textContent = `0 items`;
+      subtotalText.textContent = `0.00`;
+      return;
+    }
+
+    linesBody.innerHTML = items.map((it, i) => {
+      const lineTotal = Number(it.qty || 0) * Number(it.cost || 0);
+      return `
+        <tr>
+          <td>
+            <div class="fw-semibold">${it.sku || ''}</div>
+            <div class="small text-muted text-truncate" style="max-width:320px">${it.name || ''}</div>
+          </td>
+          <td class="text-end">
+            <input type="number" min="0.0001" step="0.0001" class="form-control form-control-sm text-end" value="${it.qty}" data-field="qty" data-index="${i}">
+          </td>
+          <td class="text-end">
+            <input type="number" min="0" step="0.0001" class="form-control form-control-sm text-end" value="${it.cost || 0}" data-field="cost" data-index="${i}">
+          </td>
+          <td class="text-end">KES ${money(lineTotal)}</td>
+          <td class="text-end">
+            <button class="btn btn-sm btn-outline-danger" data-remove="${i}">
+              <i class="bi bi-trash"></i>
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    linesBody.querySelectorAll('input[data-field]').forEach(inp => {
+      inp.addEventListener('input', () => {
+        const idx = Number(inp.dataset.index);
+        const field = inp.dataset.field;
+        const val = inp.value;
+        if (!items[idx]) return;
+
+        if (field === 'qty' || field === 'cost'){
+          items[idx][field] = Number(val || 0);
+        } else if (field === 'expiry'){
+          items[idx].expiry = val || ''; // allow blank (optional)
+        } else if (field === 'batch'){
+          items[idx].batch_no = val || '';
+        }
+        renderLines();
+      });
+    });
+
+    linesBody.querySelectorAll('button[data-remove]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = Number(btn.dataset.remove);
+        removeLine(items[idx]?.product_id, idx);
+      });
+    });
+
+    renderTotalsOnly();
+  }
+
+  function renderTotalsOnly(){
+    const grandTotal = items.reduce(
+      (sum, it) => sum + (Number(it.qty || 0) * Number(it.cost || 0)),
+      0
+    );
+    subtotalText.textContent = money(grandTotal);
+    lineCount.textContent = `${items.length} ${items.length === 1 ? 'item' : 'items'}`;
+  }
+
+  btnClear.addEventListener('click', () => {
+    items = [];
+    renderLines();
+  });
+
+  // ---------- Submit Purchase ----------
+  btnSubmit.addEventListener('click', async () => {
+    if (!items.length){
+      showToast('No items to submit', 'warning');
+      return;
+    }
+
+    const today = todayISO();
+    if (!supplierInp.value){
+      showToast('Select a supplier', 'warning');
+      return;
+    }
+
+    for (const [i, it] of items.entries()){
+      if (Number(it.qty) <= 0){
+        showToast(`Line ${i+1}: quantity must be > 0`, 'warning');
+        return;
+      }
+      if (Number(it.cost) < 0){
+        showToast(`Line ${i+1}: buying cost cannot be negative`, 'warning');
+        return;
+      }
+    }
+
+    const supplierId = document.getElementById("supplier_id").value || null;
+
+    const payload = {
+      supplier_id: supplierId ? Number(supplierId) : null,
+      reference: (referenceInp.value || '').trim(),
+      purchase_date: dateInp.value || todayISO(),
+      lines: items.map(it => ({
+        product_id: it.product_id,
+        qty: it.qty,
+        buying_cost: it.cost,
+        batch_no: '',
+        expiry_date: null
+      }))
+    };
+
+    try{
+      btnSubmit.disabled = true;
+      btnSubmit.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Saving…`;
+
+      const resp = await fetch("{% url 'accounts:purchase-submit' %}", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": getCookie('csrftoken'),
+          "X-Requested-With": "XMLHttpRequest"
+        },
+        credentials: "same-origin",
+        body: JSON.stringify(payload)
+      });
+
+      const data = await resp.json().catch(()=> ({}));
+      if (!resp.ok){
+        const msg = data && (data.detail || data.error) ? (data.detail || data.error) : `Failed (${resp.status})`;
+        showToast(msg, 'danger');
+        console.error('purchase-submit error', data);
+        return;
+      }
+
+      // The submitted record is now a draft purchase order.
+      window.location.href = "{% url 'accounts:purchase-orders' %}";
+      return;
+
+      // Success
+      const total = items.reduce((s, it) => s + (Number(it.qty||0) * Number(it.cost||0)), 0);
+      document.getElementById('rec-ref').textContent = payload.reference || '(no reference)';
+      document.getElementById('rec-total').textContent = money(total);
+
+      if (!receiptModal && window.bootstrap){
+        const el = document.getElementById('purchaseReceiptModal');
+        if (el) receiptModal = new bootstrap.Modal(el);
+      }
+      if (receiptModal) receiptModal.show();
+
+      showToast('Purchase saved', 'success');
+      // Reset
+      items = [];
+      renderLines();
+      supplierInp.value = '';
+      referenceInp.value = '';
+    }catch(err){
+      console.error(err);
+      showToast('Network error saving purchase', 'danger');
+    }finally{
+      btnSubmit.disabled = false;
+      btnSubmit.innerHTML = `<i class="bi bi-check2-circle me-1"></i>Submit Purchase`;
+    }
+  });
+
+  // Toast helper
+  function showToast(message, variant='success'){
+    const toastEl = document.getElementById('toast');
+    const body = document.getElementById('toast-body');
+    if (body) body.textContent = message;
+    toastEl.classList.remove('text-bg-success','text-bg-danger','text-bg-warning','text-bg-info');
+    toastEl.classList.add(`text-bg-${variant}`);
+    new bootstrap.Toast(toastEl, { delay: 2500 }).show();
+  }
+
+  // Initial
+  renderLines();
+})();
+</script>
+
+{% endblock %}

@@ -1,0 +1,111 @@
+{% extends "accounts/base.html" %}
+{% block dashboard_content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3>
+        <i class="bi bi-file-earmark-text text-primary me-2"></i>
+        RFQs
+    </h3>
+
+    <button class="btn btn-primary">
+        <i class="bi bi-plus-circle me-1"></i>
+        New RFQ
+    </button>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body table-responsive">
+
+    
+
+<table id="rfqTable" class="table table-hover erp-table align-middle w-100">
+    <thead class="table-light">
+        <tr>
+            <th>RFQ No</th>
+            <th>Consolidated Order</th>
+            <th>Supplier</th>
+            <th>Valid Until</th>
+            <th>Status</th>
+            <th class="no-sort text-end">Actions</th>
+        </tr>
+    </thead>
+
+    <tbody>
+
+        {% for rfq in rfqs %}
+
+        <tr>
+
+            <td>
+                {{ rfq.rfq_no }}
+            </td>
+          
+
+            <td>
+                <a href="{% url 'accounts:consolidated-order-detail' rfq.consolidated_order.id %}"
+                   class="badge bg-secondary text-decoration-none">
+                    CO-{{ rfq.consolidated_order.id }}
+                </a>
+            </td>
+
+
+            <td>
+                {{ rfq.supplier }}
+            </td>
+
+            <td data-order="{{ rfq.valid_until|date:'Ymd' }}">
+                {{ rfq.valid_until }}
+            </td>
+
+            <td data-order="{{ rfq.status }}">
+
+                <span class="badge bg-info">
+                    {{ rfq.status }}
+                </span>
+
+            </td>
+
+            <td class="text-end">
+
+                <div class="btn-group">
+
+                    {% if rfq.status == "AWARDED" or rfq.status == "NOT_AWARDED" or rfq.status == "ORDERED" %}
+
+                    <a href="{% url 'accounts:quotation-comparison' rfq.consolidated_order.id %}" class="btn btn-sm btn-outline-info" >
+                        <i class="bi bi-bar-chart me-1"></i>
+                        Compare
+                    </a>
+                    {% else %}
+
+                    <a href="{% url 'accounts:quotation-entry' rfq.id %}" class="btn btn-sm btn-outline-primary" >
+                        <i class="bi bi-currency-dollar me-1"></i>
+                        Enter Prices
+                    </a>
+
+                    <a href="{% url 'accounts:quotation-comparison' rfq.consolidated_order.id %}" class="btn btn-sm btn-outline-info" >
+                        <i class="bi bi-bar-chart me-1"></i>
+                        Compare
+                    </a>
+                    
+                    <a href="{% url 'accounts:award-supplier' rfq.id  %}" class="btn btn-sm btn-outline-success" >
+                        <i class="bi bi-trophy me-1"></i>
+                        Award
+                    </a>
+                    {% endif %}
+                </div>
+
+
+            </td>
+
+        </tr>
+
+        {% endfor %}
+
+    </tbody>
+
+</table>
+
+    </div>
+</div>
+
+{% endblock %}

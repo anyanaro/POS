@@ -1,0 +1,444 @@
+{% extends "accounts/base.html" %}
+{% load humanize %}
+{% load static %}
+
+{% block dashboard_content %}
+
+<style>
+/* Section titles */
+.section-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    padding: 8px 0;
+    margin-bottom: 10px;
+}
+
+/* Card visual improvements */
+.card {
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.card-header {
+    background: linear-gradient(90deg, #f8f9fa, #ffffff);
+    border-bottom: 1px solid #e9ecef;
+    padding: 14px 18px;
+}
+
+.table thead th {
+    background: #f1f3f5 !important;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+}
+
+.table td {
+    padding: 10px 12px;
+    vertical-align: middle;
+}
+
+.badge {
+    font-size: 11px;
+    padding: 5px 7px;
+}
+</style>
+
+<!-- PAGE HEADER -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3 class="mb-0">Transfer History</h3>
+
+    <form method="get" class="d-flex gap-2">
+        <input type="text" name="q" value="{{ request.GET.q }}"
+               placeholder="Search SKU, product, branch..."
+               class="form-control form-control-sm">
+
+        <select name="status" class="form-select form-select-sm">
+            <option value="">All Status</option>
+            <option value="PENDING"  {% if request.GET.status == "PENDING" %}selected{% endif %}>Pending</option>
+            <option value="APPROVED" {% if request.GET.status == "APPROVED" %}selected{% endif %}>Approved</option>
+            <option value="EXECUTED" {% if request.GET.status == "EXECUTED" %}selected{% endif %}>Executed</option>
+            <option value="REJECTED" {% if request.GET.status == "REJECTED" %}selected{% endif %}>Rejected</option>
+        </select>
+
+        <input type="date" name="from" class="form-control form-control-sm" value="{{ request.GET.from }}">
+        <input type="date" name="to" class="form-control form-control-sm" value="{{ request.GET.to }}">
+
+        <button class="btn btn-primary btn-sm">
+            <i class="bi bi-search"></i>
+        </button>
+
+        <a href="{% url 'accounts:transfer-history' %}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-x-circle"></i>
+        </a>
+    </form>
+</div>
+
+<!-- ============================
+     TABLE 1: TRANSFER REQUESTS
+     ============================ -->
+<div class="card shadow-sm mb-5">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <div class="section-title m-0">Transfer Requests</div>
+        <span class="small text-muted">({{ history|length }} results)</span>
+    </div>
+
+    <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+        <table class="table table-hover erp-table table-sm mb-0 align-middle">
+            <thead class="sticky-top" style="top:0;">
+                <tr>
+                    <th>Transfer No</th>
+                    <th>Product</th>
+                    <th>From → To</th>                  
+                    <th>Status</th>
+                    <th>Requested</th>
+                    <th>Approved</th>
+                    <th>Executed</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% if history %}
+                    {% for t in history %}
+                    <tr>
+                        <!-- Transfer No. -->
+                        <td>
+
+                            <strong>
+                                {{ t.transfer_no }}
+                            </strong>
+                        
+                        </td>
+                        <!-- PRODUCT -->
+                        <td style="min-width:350px;">
+
+                            {% for line in t.lines.all %}
+                        
+                                <div class="mb-2 border-bottom pb-1">
+                        
+                                    <div class="fw-semibold">
+                                        {{ line.product.sku }}
+                                    </div>
+                        
+                                    <div class="small text-muted">
+                                        {{ line.product.name }}
+                                        <span class="badge bg-primary me-1">
+                                            {{ line.qty|intcomma }}
+                                        </span>
+                                    </div>
+
+                                    
+                        
+                                </div>
+                        
+                            {% empty %}
+                        
+                                <span class="text-muted">
+                                    No Items
+                                </span>
+                        
+                            {% endfor %}
+                        
+                        </td>
+
+
+                        <!-- FROM → TO -->
+                        <td>
+                            <span class="badge bg-danger-subtle text-danger border">{{ t.from_branch.name }}</span>
+                            <i class="bi bi-arrow-right mx-1"></i>
+                            <span class="badge bg-success-subtle text-success border">{{ t.to_branch.name }}</span>
+                        </td>
+
+
+                        <!-- STATUS -->
+                        <td>
+                            {% if t.status == "PENDING" %}
+                                <span class="badge bg-warning text-dark">Pending</span>
+                            {% elif t.status == "APPROVED" %}
+                                <span class="badge bg-info text-dark">Approved</span>
+                            {% elif t.status == "REJECTED" %}
+                                <span class="badge bg-danger">Rejected</span>
+                            {% elif t.status == "EXECUTED" %}
+                                <span class="badge bg-success">Executed</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Unknown</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- DATES -->
+                        <td class="small text-muted">{{ t.created_at|date:"Y-m-d H:i" }}</td>
+                        <td class="small text-muted">
+                            {% if t.approved_at %}{{ t.approved_at|date:"Y-m-d H:i" }}{% else %}—{% endif %}
+                        </td>
+                        <td class="small text-muted">
+                            {% if t.executed_at %}{{ t.executed_at|date:"Y-m-d H:i" }}{% else %}—{% endif %}
+                        </td>
+
+                        <!-- Actions -->
+                        <td>
+
+                            {% if t.status == "APPROVED" %}
+                        
+                            <button
+                                type="button"
+                                class="btn btn-primary btn-sm execute-transfer-btn"
+                                data-id="{{ t.id }}"
+                                data-transfer="{{ t.transfer_no }}">
+                            
+                                <i class="bi bi-truck me-1"></i>
+                                Execute
+                            
+                            </button>
+
+                        
+                            {% elif t.status == "EXECUTED" %}
+                        
+                                <span class="badge bg-success">
+                                    Completed
+                                </span>
+                        
+                            {% endif %}
+                        
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted py-4">No transfer activity found.</td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ============================
+     TABLE 2: STOCK LEDGER
+     ============================ -->
+<div class="card shadow-sm mb-5">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <div class="section-title m-0">Stock Ledger – Transfer In/Out</div>
+        <span class="small text-muted">({{ stock_moves|length }} results)</span>
+    </div>
+
+    <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+        <table class="table table-hover erp-table table-sm mb-0 align-middle">
+            <thead class="sticky-top" style="top:0;">
+                <tr>
+                    <th>Product</th>
+                    <th>Branch</th>
+                    <th>Qty Change</th>
+                    <th>Reason</th>
+                    <th>Reference</th>
+                    <th>Timestamp</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% if stock_moves %}
+                    {% for s in stock_moves %}
+                    <tr>
+                        <td>
+                            <div class="fw-semibold">{{ s.product.sku }}</div>
+                            <div class="small text-muted">{{ s.product.name }}</div>
+                        </td>
+
+                        <td>
+                            <span class="badge bg-info-subtle text-info border">{{ s.branch.name }}</span>
+                        </td>
+
+                        <td>
+                            <span class="badge {% if s.qty_change > 0 %}bg-success{% else %}bg-danger{% endif %}">
+                                {{ s.qty_change|floatformat:0|intcomma }}
+                            </span>
+                        </td>
+
+                        <td><span class="badge bg-secondary">{{ s.reason }}</span></td>
+
+                        <td class="small text-muted">{{ s.reference|default:"—" }}</td>
+
+                        <td class="small text-muted">{{ s.created_at|date:"Y-m-d H:i" }}</td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-4">No stock ledger movement found.</td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div
+    class="modal fade"
+    id="executeTransferModal"
+    tabindex="-1">
+
+    <div class="modal-dialog modal-dialog-centered">
+
+        <div class="modal-content">
+
+            <div class="modal-header">
+
+                <h5 class="modal-title">
+
+                    <i class="bi bi-truck me-2"></i>
+
+                    Confirm Transfer Execution
+
+                </h5>
+
+                <button
+                    type="button"
+                    class="btn-close"
+                    data-bs-dismiss="modal">
+                </button>
+
+            </div>
+
+            <div class="modal-body">
+
+                <div class="alert alert-warning mb-0">
+
+                    <strong>Warning:</strong>
+
+                    <div class="alert alert-danger">
+                        This action cannot be reversed automatically.
+                        Stock balances in both branches will be updated immediately.
+                    </div>
+
+                    Executing this transfer will:
+
+                    <ul class="mt-2 mb-0">
+
+                        <li>Deduct stock from the source branch</li>
+
+                        <li>Add stock to the destination branch</li>
+
+                        <li>Create stock ledger entries</li>
+
+                        <li>Mark the transfer as Executed</li>
+
+                    </ul>
+
+                </div>
+                
+
+            </div>
+
+            <div class="modal-footer">
+
+                <button
+                    type="button"
+                    class="btn btn-secondary"
+                    data-bs-dismiss="modal">
+
+                    Cancel
+
+                </button>
+
+                <button
+                    type="button"
+                    id="confirmExecuteTransfer"
+                    class="btn btn-primary">
+
+                    <i class="bi bi-check-circle me-1"></i>
+
+                    Execute Transfer
+
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+
+    let transferToExecute = null;
+    
+    document.addEventListener(
+        "click",
+        function(e){
+    
+            const btn =
+                e.target.closest(
+                    ".execute-transfer-btn"
+                );
+    
+            if(!btn) return;
+    
+            transferToExecute =
+                btn.dataset.id;
+    
+            const modal =
+                new bootstrap.Modal(
+                    document.getElementById(
+                        "executeTransferModal"
+                    )
+                );
+    
+            modal.show();
+    
+        }
+    );
+    
+    document.getElementById(
+        "confirmExecuteTransfer"
+    ).addEventListener(
+        "click",
+        async function(){
+    
+            if(!transferToExecute){
+                return;
+            }
+    
+            const resp =
+                await fetch(
+                    "/api/transfer/execute-approved/",
+                    {
+                        method: "POST",
+    
+                        headers: {
+                            "Content-Type":
+                                "application/json",
+    
+                            "X-CSRFToken":
+                                document.cookie.match(
+                                    /csrftoken=([^;]+)/
+                                )[1]
+                        },
+    
+                        body: JSON.stringify({
+                            id: transferToExecute
+                        })
+                    }
+                );
+    
+            const data =
+                await resp.json();
+    
+            if(resp.ok){
+    
+                location.reload();
+    
+            }else{
+    
+                alert(
+                    data.error ||
+                    "Transfer execution failed"
+                );
+    
+            }
+    
+        }
+    );
+    
+    </script>
+
+{% endblock %}

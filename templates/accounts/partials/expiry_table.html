@@ -1,0 +1,82 @@
+<div class="table-responsive">
+
+    <table
+        class="table table-hover table-bordered align-middle erp-table">
+
+        <thead class="table-light">
+
+            <tr>
+
+                <th>Product</th>
+
+                <th>Batch</th>
+
+                <th>Expiry Date</th>
+
+                <th>Branch</th>
+
+                <th class="text-end">Qty</th>
+
+            </tr>
+
+        </thead>
+
+        <tbody>
+
+            {% for batch in rows %}
+
+            <tr>
+
+                <td>
+
+                    <strong>
+                        {{ batch.product.sku }}
+                    </strong>
+
+                    <br>
+
+                    <small class="text-muted">
+                        {{ batch.product.name }}
+                    </small>
+
+                </td>
+
+                <td>
+                    {{ batch.batch_no }}
+                </td>
+
+                <td>
+
+                    {% if batch.expiry_date %}
+                        {{ batch.expiry_date|date:"d M Y" }}
+                    {% else %}
+                        -
+                    {% endif %}
+
+                </td>
+
+                <td>
+                    {{ batch.branch.name }}
+                </td>
+
+                <td class="text-end">
+
+                    <span class="badge bg-primary">
+                        {{ batch.qty_on_hand|floatformat:0 }}
+                    </span>
+
+                </td>
+
+            </tr>
+
+            {% empty %}
+
+           
+
+            {% endfor %}
+
+        </tbody>
+
+    </table>
+
+</div>

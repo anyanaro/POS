@@ -1,0 +1,51 @@
+{% extends "accounts/base.html" %}
+{% block dashboard_content %}
+
+<h4 class="mb-3">Delete Supplier</h4>
+
+<div class="alert alert-warning">
+  <i class="bi bi-exclamation-triangle me-1"></i>
+  Are you sure you want to delete <strong>{{ supplier.name }}</strong>?
+</div>
+
+<div class="d-flex gap-2">
+  <button id="btn-delete" class="btn btn-danger">
+    <i class="bi bi-trash me-1"></i> Delete
+  </button>
+  <a class="btn btn-outline-secondary" href="{% url 'accounts:supplier-manage' %}">Cancel</a>
+</div>
+
+<script>
+(function(){
+  const btn = document.getElementById('btn-delete');
+  const apiUrl = "{{ api_url }}";
+
+  function getCSRF(){
+    const m = document.cookie.match(/csrftoken=([^;]+)/);
+    return m ? m[1] : '';
+  }
+
+  btn.addEventListener('click', async () => {
+    btn.disabled = true; btn.textContent = "Deleting…";
+    try {
+      const resp = await fetch(apiUrl, {
+        method: 'DELETE',
+        headers: {'X-CSRFToken': getCSRF(), 'X-Requested-With': 'XMLHttpRequest'},
+        credentials: 'same-origin'
+      });
+      if (!resp.ok){
+        alert("Delete failed (" + resp.status + ")");
+        btn.disabled = false; btn.textContent = "Delete";
+        return;
+      }
+      window.location.href = "{% url 'accounts:supplier-manage' %}?toast=deleted";
+    } catch (e){
+      console.error(e);
+      alert("Network error.");
+      btn.disabled = false; btn.textContent = "Delete";
+    }
+  });
+})();
+</script>
+
+{% endblock %}

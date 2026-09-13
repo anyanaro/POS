@@ -1,0 +1,49 @@
+{% extends "accounts/base.html" %}
+{% block dashboard_content %}
+
+<h3>
+<i class="bi bi-award text-primary me-2"></i>
+Supplier Performance
+</h3>
+
+<div class="card shadow-sm mt-3">
+
+<div class="card-body table-responsive">
+
+<table class="table erp-table">
+
+<thead>
+
+<tr>
+<th>Supplier</th>
+<th>Orders</th>
+<th>Lead Time</th>
+<th>Fill Rate</th>
+</tr>
+
+</thead>
+
+<tbody>
+
+{% for row in suppliers %}
+
+<tr>
+
+<td>{{ row.name }}</td>
+<td>{{ row.orders }}</td>
+<td>{{ row.lead_time }}</td>
+<td>{{ row.fill_rate }}%</td>
+
+</tr>
+
+{% endfor %}
+
+</tbody>
+
+</table>
+
+</div>
+
+</div>
+
+{% endblock %}

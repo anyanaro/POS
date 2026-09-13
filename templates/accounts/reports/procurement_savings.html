@@ -1,0 +1,35 @@
+{% extends "accounts/base.html" %}
+{% block dashboard_content %}
+
+<h3>
+<i class="bi bi-piggy-bank text-success me-2"></i>
+Procurement Savings
+</h3>
+
+<div class="row g-3 mt-3">
+
+<div class="col-md-4">
+
+<div class="card border-success">
+
+<div class="card-body">
+
+<div class="small text-muted">
+Total Savings
+</div>
+
+<h2 class="text-success">
+{{ savings|default:"0.00" }}
+</h2>
+
+</div>
+
+<div class="card mt-3"><div class="card-body table-responsive"><table class="table erp-table"><thead><tr><th>Product</th><th>Market quote</th><th>Awarded cost</th><th>Saving</th></tr></thead><tbody>{% for row in rows %}<tr><td>{{ row.product }}</td><td>KES {{ row.market|floatformat:2 }}</td><td>KES {{ row.awarded|floatformat:2 }}</td><td class="text-success">KES {{ row.saving|floatformat:2 }}</td></tr>{% empty %}<tr><td colspan="4" class="text-center text-muted">No awarded quotation data.</td></tr>{% endfor %}</tbody></table></div></div>
+
+</div>
+
+</div>
+
+</div>
+
+{% endblock %}

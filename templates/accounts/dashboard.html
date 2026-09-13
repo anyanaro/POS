@@ -1,0 +1,1426 @@
+{% extends "accounts/base.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block dashboard_content %}
+
+{% comment %}
+<!-- HEADER + QUICK ACTIONS -->
+<div class="d-flex flex-wrap align-items-center gap-2 mb-4">
+  <h3 class="me-auto mb-0">Dashboard</h3>
+
+  <a href="{% url 'accounts:sales-submit' %}" class="btn btn-primary">
+    <i class="bi bi-plus-circle me-1"></i> New Sale
+  </a>
+  <a href="{% url 'accounts:product-add' %}" class="btn btn-outline-primary">
+    <i class="bi bi-box-seam me-1"></i> Add Product
+  </a>
+  <a href="{% url 'accounts:stock-adjust' %}" class="btn btn-outline-secondary">
+    <i class="bi bi-printer me-1"></i> Print Report
+  </a>
+</div>
+
+<!-- =========================================================== -->
+<!-- EXECUTIVE-ONLY KPI CARDS (Gross Margin, Inventory Health)   -->
+<!-- =========================================================== -->
+{% if role == "EXECUTIVE" %}
+<div class="row g-3 mb-4">
+
+  <!-- Gross Margin -->
+  <div class="col-12 col-sm-6 col-xl-3">
+    <div class="card shadow-sm border-0">
+      <div class="card-body">
+        <div class="text-muted small">Gross Margin (30 days)</div>
+        <div class="display-6 fw-semibold">{{ gm.gm_pct|floatformat:1 }}%</div>
+        <div class="small text-muted">
+          Rev: {{ gm.revenue|floatformat:2|intcomma }} •
+          COGS: {{ gm.cogs|floatformat:2|intcomma }} •
+          Profit: {{ gm.profit|floatformat:2|intcomma }}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Inventory Health -->
+  <div class="col-12 col-sm-6 col-xl-3">
+    <div class="card shadow-sm border-0">
+      <div class="card-body">
+        <div class="text-muted small">Inventory Health</div>
+        <div class="display-6 fw-semibold">{{ inv.health_score }}/100</div>
+        <div class="small text-muted">
+          Low≤5: {{ inv.low_stock }} • Stockouts: {{ inv.stockouts }} • Dead: {{ inv.dead_stock }}
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endif %}
+
+<!-- =========================================================== -->
+<!-- SHARED KPI CARDS (both roles see these)                     -->
+<!-- =========================================================== -->
+<div class="row g-3 mb-4">
+
+  <!-- Total Sales -->
+  <div class="col-12 col-sm-6 col-xl-3">
+    <div class="card shadow-sm border-0">
+      <div class="card-body">
+        <div class="text-muted small">Total Sales (30 days)</div>
+        <div class="fs-4 fw-semibold">{{ total_sales|floatformat:2|intcomma }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stock Value -->
+  <div class="col-12 col-sm-6 col-xl-3">
+    <div class="card shadow-sm border-0">
+      <div class="card-body">
+        <div class="text-muted small">Stock Value</div>
+        <div class="fs-4 fw-semibold">{{ stock_value|floatformat:2|intcomma }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Average Branch Risk -->
+  <div class="col-12 col-sm-6 col-xl-3">
+    <div class="card shadow-sm border-0">
+      <div class="card-body">
+        <div class="text-muted small">Average Branch Risk</div>
+        <div class="fs-4 fw-semibold">{{ avg_risk }} / 100</div>
+        <div class="small text-muted">Max: {{ max_risk }} / 100</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Low Stock Count -->
+  <div class="col-12 col-sm-6 col-xl-3">
+    <div class="card shadow-sm border-0">
+      <div class="card-body">
+        <div class="text-muted small">Low Stock (≤5)</div>
+        <div class="fs-4 fw-semibold">{{ low_stock_count }}</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- =========================================================== -->
+<!-- EXECUTIVE-ONLY AI INSIGHTS                                  -->
+<!-- =========================================================== -->
+{% if role == "EXECUTIVE" %}
+<div class="card shadow-sm my-4">
+  <div class="card-header bg-white"><strong>AI Insights</strong></div>
+  <div class="card-body">
+    {% if insights %}
+      <ul>
+        {% for line in insights %}
+        <li class="mb-1">{{ line }}</li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <div class="text-muted small">No insights available.</div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+<!-- =========================================================== -->
+<!-- SALES CHART (both roles) + Notifications                     -->
+<!-- =========================================================== -->
+<div class="row g-3">
+  <div class="col-12 col-lg-8">
+    <div class="card shadow-sm">
+      <div class="card-header bg-white"><strong>Sales (Last 14 Days)</strong></div>
+      <div class="card-body">
+        <canvas id="salesChart" height="90"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-header bg-white"><strong>Notifications</strong></div>
+      <div class="card-body">
+        {% if notifications %}
+        <ul class="list-group list-group-flush">
+          {% for n in notifications %}
+          <li class="list-group-item d-flex gap-2">
+            <span class="badge bg-{{ n.level }}">{{ n.level }}</span>
+            {{ n.text }}
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <div class="text-muted small">No alerts at the moment.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- =========================================================== -->
+<!-- EXECUTIVE-ONLY: 30‑Day Trend + Branch Forecast               -->
+<!-- =========================================================== -->
+{% if role == "EXECUTIVE" %}
+<div class="row g-3 my-4">
+
+  <!-- 30‑Day Revenue & Profit -->
+  <div class="col-12 col-xl-8">
+    <div class="card shadow-sm">
+      <div class="card-header bg-white"><strong>30‑Day Revenue & Profit</strong></div>
+      <div class="card-body">
+        <canvas id="trend30" height="120"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- 7‑Day Branch Forecast -->
+  <div class="col-12 col-xl-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-header bg-white"><strong>7‑Day Branch Forecast</strong></div>
+      <div class="card-body">
+        <canvas id="branchForecast" height="140"></canvas>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endif %}
+
+<!-- =========================================================== -->
+<!-- PROFIT TREND + TODAY LEADERBOARD (both roles)                -->
+<!-- =========================================================== -->
+<div class="row g-3 my-4">
+
+  <!-- Profit Trend -->
+  <div class="col-12 col-xl-6">
+    <div class="card shadow-sm">
+      <div class="card-header bg-white"><strong>Profit Trend (Last 14 Days)</strong></div>
+      <div class="card-body">
+        <canvas id="profitSpark" height="80"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Today’s Store Leaderboard -->
+  <div class="col-12 col-xl-6">
+    <div class="card shadow-sm">
+      <div class="card-header bg-white d-flex justify-content-between">
+        <strong>Today’s Store Leaderboard</strong>
+        <span class="small text-muted">Revenue</span>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-sm">
+          <thead class="table-light">
+            <tr><th>Branch</th><th class="text-end">Revenue</th></tr>
+          </thead>
+          <tbody>
+            {% for row in leaderboard %}
+            <tr>
+              <td>{{ row.branch_name }}</td>
+              <td class="text-end">{{ row.revenue|floatformat:2|intcomma }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="2" class="text-center text-muted py-3">No sales today</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- =========================================================== -->
+<!-- TOP SELLERS (both roles) + BRANCH COMPARISON                -->
+<!-- =========================================================== -->
+<div class="row g-3 my-4">
+
+  <!-- Top 5 Selling -->
+  <div class="col-12 col-xl-5">
+    <div class="card shadow-sm">
+      <div class="card-header bg-white"><strong>Top 5 Selling Products</strong></div>
+      <div class="card-body">
+        <table class="table table-sm">
+          <thead><tr><th>SKU</th><th>Product</th><th class="text-end">Units</th></tr></thead>
+          <tbody>
+            {% for p in top5 %}
+            <tr>
+              <td>{{ p.product__sku }}</td>
+              <td>{{ p.product__name }}</td>
+              <td class="text-end">{{ p.units|floatformat:0|intcomma }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="3" class="text-center text-muted">No data</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Branch Comparison -->
+  <div class="col-12 col-xl-7">
+    <div class="card shadow-sm">
+      <div class="card-header bg-white"><strong>Branch Comparison (Revenue)</strong></div>
+      <div class="card-body">
+        <canvas id="branchChart" height="150"></canvas>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- =========================================================== -->
+<!-- EXECUTIVE-ONLY: Cashier LB + Basket Analysis                -->
+<!-- =========================================================== -->
+{% if role == "EXECUTIVE" %}
+<div class="row g-3 my-4">
+
+  <!-- Cashier Leaderboard -->
+  <div class="col-12 col-xl-6">
+    <div class="card shadow-sm">
+      <div class="card-header bg-white"><strong>Cashier Leaderboard (30 days)</strong></div>
+      <div class="card-body p-0">
+        <table class="table table-sm">
+          <thead><tr><th>Cashier</th><th class="text-end">Orders</th><th class="text-end">Revenue</th><th class="text-end">AOV</th></tr></thead>
+          <tbody>
+            {% for c in cashiers %}
+            <tr>
+              <td>{{ c.cashier }}</td>
+              <td class="text-end">{{ c.orders }}</td>
+              <td class="text-end">{{ c.revenue|floatformat:2|intcomma }}</td>
+              <td class="text-end">{{ c.aov|floatformat:2|intcomma }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" class="text-center text-muted py-3">No data</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Frequently Bought Together -->
+  <div class="col-12 col-xl-6">
+    <div class="card shadow-sm">
+      <div class="card-header bg-white"><strong>Frequently Bought Together</strong></div>
+      <div class="card-body p-0">
+        <table class="table table-sm">
+          <thead><tr><th>Product A</th><th>Product B</th><th class="text-end">Count</th></tr></thead>
+          <tbody>
+            {% for p in pairs %}
+            <tr>
+              <td>{{ p.sku_a }} – {{ p.name_a }}</td>
+              <td>{{ p.sku_b }} – {{ p.name_b }}</td>
+              <td class="text-end">{{ p.count }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="3" class="text-center text-muted py-3">Not enough data</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endif %}
+
+<!-- =========================================================== -->
+<!-- BRANCH RISK TABLE (both roles)                               -->
+<!-- =========================================================== -->
+<div class="card shadow-sm my-4">
+  <div class="card-header bg-white"><strong>Branch Risk Overview</strong></div>
+  <div class="card-body p-0">
+    <table class="table table-sm">
+      <thead><tr><th>Branch</th><th class="text-end">Risk</th><th class="text-end">Status</th></tr></thead>
+      <tbody>
+        {% for r in risk_scores %}
+        {% with score=r.score %}
+        <tr>
+          <td>{{ r.branch }}</td>
+          <td class="text-end">{{ score }}</td>
+          <td class="text-end">
+            {% if score > 70 %}
+            <span class="badge bg-danger">High</span>
+            {% elif score > 40 %}
+            <span class="badge bg-warning text-dark">Med</span>
+            {% else %}
+            <span class="badge bg-success">Low</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endwith %}
+        {% empty %}
+        <tr><td colspan="3" class="text-center text-muted py-3">No branch data</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- =========================================================== -->
+<!-- REORDER + COVER GAUGE (both roles)                          -->
+<!-- =========================================================== -->
+<div class="row g-3 my-4">
+
+  <!-- LEFT SIDE: STACKED TABLES -->
+  <div class="col-12 col-xl-8">
+
+    <!-- ================= TABLE 1: AI REORDER RECOMMENDATIONS ================= -->
+    <div class="card shadow-sm mb-3">
+      <div class="card-header bg-white">
+        <strong>AI Reorder Recommendations by Branch</strong>
+      </div>
+
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <thead>
+            <tr>
+              <th>SKU</th>
+              <th>Product</th>
+              <th>Branch</th>
+              <th>On Hand</th>
+              <th>Demand/day</th>
+              <th>Days Cover</th>
+              <th>Recommended</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {% for x in restock %}
+            <tr class="{% if x.on_hand == 0 %}table-danger{% elif x.on_hand <= 5 %}table-warning{% endif %}">
+              <td>{{ x.sku }}</td>
+              <td>{{ x.name }}</td>
+              <td>{{ x.branch_name }}</td>
+              <td>{{ x.on_hand }}</td>
+              <td>{{ x.daily_demand }}</td>
+              <td>{{ x.cover_days }}</td>
+              <td>{{ x.recommended_qty }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+
+
+    <!-- ================= TABLE 2: AI TRANSFER RECOMMENDATIONS ================= -->
+    <div class="card shadow-sm mb-3">
+      <div class="card-header bg-white">
+        <strong>AI Transfer Recommendations</strong>
+      </div>
+
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th>From</th>
+              <th>To</th>
+              <th>Qty</th>
+              <th>From Stock</th>
+              <th>To Stock</th>
+              <th>Demand/Day</th>
+              <th>Cover Days</th>
+              <th></th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {% for t in transfers %}
+            <tr>
+              <td>{{ t.sku }} — {{ t.product }}</td>
+              <td class="text-danger">{{ t.from_branch }}</td>
+              <td class="text-success">{{ t.to_branch }}</td>
+              <td><strong>{{ t.qty }}</strong></td>
+              <td>{{ t.from_stock }}</td>
+              <td>{{ t.to_stock }}</td>
+              <td>{{ t.to_demand }}</td>
+              <td>{{ t.to_cover }}</td>
+
+              <td>
+              <button
+                class="btn btn-sm btn-primary execute-transfer-btn"
+                data-id="{{ t.id }}"
+                data-product="{{ t.product_id }}"
+                data-productname="{{ t.product }}"
+                data-sku="{{ t.sku }}"
+                data-from="{{ t.from_branch_id }}"
+                data-to="{{ t.to_branch_id }}"
+                data-fromname="{{ t.from_branch }}"
+                data-toname="{{ t.to_branch }}"
+                data-qty="{{ t.qty }}"
+            >
+                <i class="bi bi-arrow-left-right"></i> Transfer
+            </button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+
+
+    <!-- ================= TABLE 3: TRANSFER HISTORY ================= -->
+    <div class="card shadow-sm">
+      <div class="card-header bg-white">
+        <strong>Transfer History</strong>
+      </div>
+
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th>From</th>
+              <th>To</th>
+              <th>Qty</th>
+              <th>Status</th>
+              <th>Requested</th>
+              <th>Approved</th>
+              <th>Executed</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {% for t in history %}
+            <tr>
+              <td>{{ t.product.name }}</td>
+              <td>{{ t.from_branch.name }}</td>
+              <td>{{ t.to_branch.name }}</td>
+              <td>{{ t.qty }}</td>
+              <td>{{ t.status }}</td>
+              <td>{{ t.created_at }}</td>
+              <td>{{ t.approved_at }}</td>
+              <td>{{ t.executed_at }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div> <!-- END LEFT COL -->
+
+
+
+  <!-- ================= RIGHT SIDE: GAUGE ================= -->
+  <div class="col-12 col-xl-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-header bg-white">
+        <strong>Stock Cover Gauge</strong>
+      </div>
+
+      <div class="card-body d-flex align-items-center justify-content-center">
+        <canvas id="coverGauge" height="250"></canvas>
+      </div>
+    </div>
+  </div>
+
+</div>
+<!-- =========================================================== -->
+<!-- EXECUTIVE & MANAGER SHARED FORECASTS                        -->
+<!-- =========================================================== -->
+<div class="card shadow-sm my-4">
+  <div class="card-header bg-white"><strong>Forecasts</strong></div>
+  <div class="card-body">
+    <div class="row g-3">
+      {% for s in sparkline_series %}
+      <div class="col-12 col-sm-6 col-xl-4">
+        <div class="border rounded p-2">
+          <div class="small text-muted mb-1">{{ s.label }}</div>
+          <canvas id="spark_{{ forloop.counter }}" height="60"></canvas>
+        </div>
+      </div>
+      {% endfor %}
+      {% if not sparkline_series %}
+      <div class="text-muted small px-2">No forecast/history available.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Forecase vs Actual -->
+<div class="card shadow-sm my-4">
+  <div class="card-header bg-white"><strong>Units: Forecast vs Actual</strong></div>
+  <div class="card-body">
+    <canvas id="fcChart" height="100"></canvas>
+  </div>
+</div>
+
+<!-- HEATMAP (both roles) -->
+<div class="card shadow-sm my-4">
+  <div class="card-header bg-white"><strong>Sales Heatmap</strong></div>
+  <div class="card-body">
+    <canvas id="heatmapChart" height="260"></canvas>
+  </div>
+</div>
+
+<!-- ======================= -->
+<!--       CHART DATA        -->
+<!-- ======================= -->
+{% endcomment %}
+
+<style>
+  .executive-dashboard{ --ink:#172033; --muted:#687386; --line:#e4e9f0; --surface:#fff; --canvas:#f6f8fb; color:var(--ink); }
+  .executive-dashboard .dashboard-heading{ font-size:1.55rem; font-weight:750; letter-spacing:0; }
+  .executive-dashboard .dashboard-subtitle{ color:var(--muted); font-size:.9rem; }
+  .executive-dashboard .section-label{ color:#637085; font-size:.72rem; font-weight:750; letter-spacing:1px; text-transform:uppercase; }
+  .executive-dashboard .metric-card{ min-height:148px; background:var(--surface); border:1px solid var(--line); border-radius:8px; box-shadow:none; }
+  .executive-dashboard .metric-card .card-body{ padding:1.1rem; }
+  .executive-dashboard .metric-icon{ display:grid; place-items:center; width:38px; height:38px; border-radius:8px; font-size:1.05rem; }
+  .executive-dashboard .metric-label{ color:var(--muted); font-size:.78rem; font-weight:650; }
+  .executive-dashboard .metric-value{ font-size:1.55rem; font-weight:750; line-height:1.2; }
+  .executive-dashboard .metric-note{ color:var(--muted); font-size:.78rem; }
+  .executive-dashboard .management-card{ border:1px solid var(--line); border-radius:8px; box-shadow:none; overflow:hidden; }
+  .executive-dashboard .management-card .card-header{ padding:.9rem 1rem; background:var(--surface); border-bottom:1px solid var(--line); }
+  .executive-dashboard .management-card .card-title{ margin:0; font-size:.94rem; font-weight:750; }
+  .executive-dashboard .management-card .card-subtitle{ color:var(--muted); font-size:.75rem; }
+  .executive-dashboard .insight-list{ margin:0; padding:0; list-style:none; }
+  .executive-dashboard .insight-list li{ padding:.7rem 0; border-bottom:1px solid var(--line); color:#344055; font-size:.87rem; }
+  .executive-dashboard .insight-list li:last-child{ border-bottom:0; }
+  .executive-dashboard .insight-list li::before{ content:""; display:inline-block; width:7px; height:7px; margin:0 10px 1px 0; border-radius:50%; background:#0d6efd; }
+  .executive-dashboard .table{ margin:0; font-size:.84rem; }
+  .executive-dashboard .table > :not(caption) > * > *{ padding:.7rem 1rem; border-bottom-color:var(--line); }
+  .executive-dashboard .table thead th{ color:#637085; background:#f8fafc; font-size:.7rem; font-weight:750; letter-spacing:.6px; text-transform:uppercase; white-space:nowrap; }
+  .executive-dashboard .action-row{ background:#fff8e8; }
+  .executive-dashboard .chart-wrap{ height:270px; position:relative; }
+  .executive-dashboard .empty-state{ color:var(--muted); font-size:.86rem; padding:2rem 1rem; text-align:center; }
+  body.dark .executive-dashboard{ --ink:#eef1f5; --muted:#aab3c0; --line:#30343b; --surface:#1b1d22; --canvas:#16181c; }
+  body.dark .executive-dashboard .table thead th{ background:#202329; color:#aab3c0; }
+  body.dark .executive-dashboard .action-row{ background:#352d1d; }
+  @media (max-width: 575px){ .executive-dashboard .metric-card{ min-height:128px; } .executive-dashboard .chart-wrap{ height:230px; } }
+</style>
+
+<section class="executive-dashboard">
+  <header class="d-flex flex-wrap align-items-center gap-2 mb-4">
+    <div class="me-auto">
+      <div class="section-label mb-1">Executive Overview</div>
+      <h1 class="dashboard-heading mb-1">Business performance</h1>
+      <p class="dashboard-subtitle mb-0">A 30-day view of revenue, margin, inventory exposure, and branch health.</p>
+    </div>
+    <a href="{% url 'accounts:reports' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-bar-chart me-1"></i>Reports Centre</a>
+    <a href="{% url 'accounts:analytics-dashboard' %}" class="btn btn-primary btn-sm"><i class="bi bi-graph-up-arrow me-1"></i>Smart Analytics</a>
+  </header>
+
+  <div class="row g-3 mb-4">
+    <div class="col-12 col-sm-6 col-xl-3"><article class="card metric-card"><div class="card-body"><div class="d-flex justify-content-between"><span class="metric-label">Revenue</span><span class="metric-icon bg-primary-subtle text-primary"><i class="bi bi-cash-stack"></i></span></div><div class="metric-value mt-3">{{ total_sales|floatformat:2|intcomma }}</div><div class="metric-note mt-1">Posted sales, last 30 days</div></div></article></div>
+    <div class="col-12 col-sm-6 col-xl-3"><article class="card metric-card"><div class="card-body"><div class="d-flex justify-content-between"><span class="metric-label">Gross profit</span><span class="metric-icon bg-success-subtle text-success"><i class="bi bi-arrow-up-right-circle"></i></span></div><div class="metric-value mt-3">{{ gm.profit|floatformat:2|intcomma }}</div><div class="metric-note mt-1">{{ gm.gm_pct|floatformat:1 }}% gross margin</div></div></article></div>
+    <div class="col-12 col-sm-6 col-xl-3"><article class="card metric-card"><div class="card-body"><div class="d-flex justify-content-between"><span class="metric-label">Inventory value</span><span class="metric-icon bg-info-subtle text-info"><i class="bi bi-box-seam"></i></span></div><div class="metric-value mt-3">{{ stock_value|floatformat:2|intcomma }}</div><div class="metric-note mt-1">Current stock at recorded cost</div></div></article></div>
+    <div class="col-12 col-sm-6 col-xl-3"><article class="card metric-card"><div class="card-body"><div class="d-flex justify-content-between"><span class="metric-label">Inventory health</span><span class="metric-icon {% if inv.health_score < 60 %}bg-danger-subtle text-danger{% elif inv.health_score < 80 %}bg-warning-subtle text-warning{% else %}bg-success-subtle text-success{% endif %}"><i class="bi bi-heart-pulse"></i></span></div><div class="metric-value mt-3">{{ inv.health_score }}<span class="fs-6 text-muted">/100</span></div><div class="metric-note mt-1">{{ low_stock_count }} low-stock positions across branches</div></div></article></div>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-12 col-xl-8"><article class="card management-card h-100"><div class="card-header d-flex justify-content-between align-items-center"><div><h2 class="card-title">Revenue and gross profit</h2><div class="card-subtitle">Daily trend over the last 30 days</div></div><span class="badge text-bg-light border">30 days</span></div><div class="card-body"><div class="chart-wrap"><canvas id="trend30"></canvas></div></div></article></div>
+    <div class="col-12 col-xl-4"><article class="card management-card h-100"><div class="card-header"><h2 class="card-title">Management signals</h2><div class="card-subtitle">Current business conditions requiring attention</div></div><div class="card-body">{% if insights %}<ul class="insight-list">{% for line in insights|slice:":5" %}<li>{{ line }}</li>{% endfor %}</ul>{% else %}<div class="empty-state">No exceptional conditions are currently recorded.</div>{% endif %}</div></article></div>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-12 col-xl-7"><article class="card management-card h-100"><div class="card-header"><h2 class="card-title">Branch revenue comparison</h2><div class="card-subtitle">Revenue by branch, last 30 days</div></div><div class="card-body"><div class="chart-wrap"><canvas id="branchChart"></canvas></div></div></article></div>
+    <div class="col-12 col-xl-5"><article class="card management-card h-100"><div class="card-header"><h2 class="card-title">Branch risk register</h2><div class="card-subtitle">Stock availability and recent sales continuity</div></div><div class="table-responsive"><table class="table align-middle"><thead><tr><th>Branch</th><th class="text-end">Risk score</th><th class="text-end">Status</th></tr></thead><tbody>{% for risk in risk_scores %}<tr><td class="fw-semibold">{{ risk.branch }}</td><td class="text-end">{{ risk.score }}/100</td><td class="text-end">{% if risk.score > 70 %}<span class="badge text-bg-danger">High</span>{% elif risk.score > 40 %}<span class="badge text-bg-warning">Medium</span>{% else %}<span class="badge text-bg-success">Low</span>{% endif %}</td></tr>{% empty %}<tr><td colspan="3" class="empty-state">No branch risk data is available.</td></tr>{% endfor %}</tbody></table></div></article></div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-12 col-xl-7"><article class="card management-card h-100"><div class="card-header d-flex justify-content-between align-items-center"><div><h2 class="card-title">Priority replenishment</h2><div class="card-subtitle">Highest-priority replenishment recommendations by branch</div></div><a href="{% url 'accounts:reorder-list' %}" class="btn btn-outline-primary btn-sm">Open reorder list</a></div><div class="table-responsive"><table class="table align-middle"><thead><tr><th>Product</th><th>Branch</th><th class="text-end">On hand</th><th class="text-end">Days cover</th><th class="text-end">Recommended</th></tr></thead><tbody>{% for item in restock|slice:":8" %}<tr class="{% if item.on_hand == 0 %}action-row{% endif %}"><td><div class="fw-semibold">{{ item.name }}</div><div class="small text-muted">{{ item.sku }}</div></td><td>{{ item.branch_name }}</td><td class="text-end">{{ item.on_hand }}</td><td class="text-end">{% if item.cover_days is None %}n/a{% else %}{{ item.cover_days|floatformat:1 }}{% endif %}</td><td class="text-end fw-semibold">{{ item.recommended_qty }}</td></tr>{% empty %}<tr><td colspan="5" class="empty-state">No replenishment recommendations at this time.</td></tr>{% endfor %}</tbody></table></div></article></div>
+    <div class="col-12 col-xl-5"><article class="card management-card h-100"><div class="card-header"><h2 class="card-title">Best-selling products</h2><div class="card-subtitle">Units sold in the last 30 days</div></div><div class="table-responsive"><table class="table align-middle"><thead><tr><th>Product</th><th class="text-end">Units sold</th></tr></thead><tbody>{% for product in top5 %}<tr><td><div class="fw-semibold">{{ product.product__name }}</div><div class="small text-muted">{{ product.product__sku }}</div></td><td class="text-end fw-semibold">{{ product.units|floatformat:0|intcomma }}</td></tr>{% empty %}<tr><td colspan="2" class="empty-state">No product sales are recorded for this period.</td></tr>{% endfor %}</tbody></table></div></article></div>
+  </div>
+</section>
+
+<!-- ============================
+     TRANSFER CONFIRMATION MODAL
+     ============================ -->
+     <div class="modal fade" id="transferModal" tabindex="-1">
+      <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+    
+          <div class="modal-header">
+            <h5 class="modal-title">
+              <i class="bi bi-arrow-left-right me-2"></i>Confirm Transfer
+            </h5>
+            <button class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+    
+          <div class="modal-body">
+    
+            <div class="row g-3">
+    
+              <!-- Product Photo -->
+              <div class="col-md-3 text-center">
+                <img id="transfer-product-img"
+                     class="img-fluid rounded border"
+                     src=""
+                     alt="Product Image">
+              </div>
+    
+              <!-- Product Details -->
+              <div class="col-md-9">
+                <div class="mb-2">
+                  <strong id="transfer-product-name"></strong><br>
+                  <span class="text-muted small">
+                    SKU: <span id="transfer-product-sku"></span>
+                  </span>
+                </div>
+    
+                <!-- From → To Summary -->
+                <div class="alert alert-secondary py-2">
+                  <strong id="transfer-from"></strong>
+                  <i class="bi bi-arrow-right mx-3"></i>
+                  <strong id="transfer-to"></strong>
+                </div>
+    
+                <!-- Live Stock -->
+                <div class="row text-center small">
+                  <div class="col">
+                    <div class="fw-bold">From Stock</div>
+                    <div id="transfer-from-stock" class="text-danger"></div>
+                  </div>
+    
+                  <div class="col">
+                    <div class="fw-bold">To Stock</div>
+                    <div id="transfer-to-stock" class="text-success"></div>
+                  </div>
+                </div>
+    
+              </div>
+            </div>
+    
+            <hr>
+    
+            <!-- Suggested Quantity -->
+            <div class="alert alert-info small py-2 mb-3">
+              Suggested Qty (based on cover-days): 
+              <strong id="suggested-qty">0</strong>
+            </div>
+    
+            <!-- Quantity Slider -->
+            <label class="form-label fw-semibold">Transfer Quantity</label>
+            <div class="row align-items-center mb-3">
+              <div class="col-md-8">
+                <input type="range" min="1" max="100" value="1"
+                       class="form-range" id="transfer-qty-slider">
+              </div>
+              <div class="col-md-4">
+                <input type="number" class="form-control"
+                       id="transfer-qty" min="1">
+              </div>
+            </div>
+    
+            <!-- Notes -->
+            <label class="form-label fw-semibold">Notes</label>
+            <textarea class="form-control" id="transfer-notes" rows="2"
+                      placeholder="Optional transfer notes..."></textarea>
+    
+          </div>
+    
+          <div class="modal-footer d-flex justify-content-between">
+    
+            <a id="transfer-pdf-btn" class="btn btn-outline-secondary"
+               target="_blank">
+              <i class="bi bi-download me-1"></i> PDF Work Order
+            </a>
+    
+            <div class="d-flex gap-2">
+    
+              <button id="approve-transfer-btn"
+                      class="btn btn-warning">
+                <i class="bi bi-shield-check me-1"></i> Approve
+              </button>
+    
+              <button id="confirm-transfer-btn"
+                      class="btn btn-primary">
+                <i class="bi bi-check-circle me-1"></i> Execute Transfer
+              </button>
+    
+            </div>
+    
+          </div>
+    
+        </div>
+      </div>
+    </div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-matrix@1.3.0/dist/chartjs-chart-matrix.min.js"></script>
+
+{{ pf_labels|json_script:"pfLabels" }}
+{{ pf_values|json_script:"pfValues" }}
+
+{{ fc_labels|json_script:"fcLabels" }}
+{{ fc_actual|json_script:"fcActual" }}
+{{ fc_pred|json_script:"fcPred" }}
+
+{{ gauge_cover|json_script:"gaugeCover" }}
+{{ gauge_target|json_script:"gaugeTarget" }}
+
+{{ chart_labels|json_script:"salesLabels" }}
+{{ chart_values|json_script:"salesValues" }}
+
+{{ branch_comp|json_script:"branchComp" }}
+
+{{ sparkline_series|json_script:"sparklineSeries" }}
+
+{{ heatmap_data|json_script:"heatmapData" }}
+
+{{ tr30_labels|json_script:"tr30Labels" }}
+{{ tr30_revenue|json_script:"tr30Revenue" }}
+{{ tr30_profit|json_script:"tr30Profit" }}
+
+{{ fc7_labels|json_script:"fc7Labels" }}
+{{ fc7_series|json_script:"fc7Series" }}
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+  let activeTransfer = {};
+  let transferModal;
+  
+  document.addEventListener("DOMContentLoaded", () => {
+  
+      const modalEl = document.getElementById("transferModal");
+      if (!modalEl) {
+          console.error("transferModal NOT FOUND");
+          return;
+      }
+  
+      transferModal = new bootstrap.Modal(modalEl);
+  
+      setupTransferButtons();
+  });
+  
+  // Attach modal open handlers
+  function setupTransferButtons() {
+  
+      const buttons = document.querySelectorAll(".execute-transfer-btn");
+  
+      if (!buttons.length) {
+          console.warn("No .execute-transfer-btn found.");
+          return;
+      }
+  
+      buttons.forEach(btn => {
+          btn.addEventListener("click", async () => {
+  
+              // Store active transfer object
+              activeTransfer = {
+                  id: btn.dataset.id,
+                  product_id: btn.dataset.product,
+                  product_name: btn.dataset.productname,
+                  sku: btn.dataset.sku,
+                  from_branch: btn.dataset.from,
+                  to_branch: btn.dataset.to,
+                  qty: btn.dataset.qty
+              };
+  
+              // FIXED PDF URL (no &amp;)
+              document.getElementById("transfer-pdf-btn").href =
+                  `/api/transfer/pdf/?product_name=${encodeURIComponent(activeTransfer.product_name)}`
+                  + `&sku=${encodeURIComponent(activeTransfer.sku)}`
+                  + `&qty=${activeTransfer.qty}`
+                  + `&from_branch=${activeTransfer.from_branch}`
+                  + `&to_branch=${activeTransfer.to_branch}`;
+  
+              // Fill modal
+              document.getElementById("transfer-product-name").textContent = activeTransfer.product_name;
+              document.getElementById("transfer-product-sku").textContent = activeTransfer.sku;
+              document.getElementById("transfer-from").textContent = "From: " + btn.dataset.fromname;
+              document.getElementById("transfer-to").textContent = "To: " + btn.dataset.toname;
+              document.getElementById("transfer-product-img").src = `/media/products/${activeTransfer.sku}.jpg`;
+  
+              document.getElementById("transfer-qty").value = activeTransfer.qty;
+              document.getElementById("suggested-qty").textContent = activeTransfer.qty;
+              document.getElementById("transfer-notes").value = "";
+  
+              // Fetch stock
+              const stockResp = await fetch(`/api/branch/stock/${activeTransfer.product_id}/`);
+              const stockData = await stockResp.json();
+  
+              document.getElementById("transfer-from-stock").textContent =
+                  stockData[activeTransfer.from_branch] || 0;
+  
+              document.getElementById("transfer-to-stock").textContent =
+                  stockData[activeTransfer.to_branch] || 0;
+  
+              transferModal.show();
+          });
+      });
+  }
+  
+  // APPROVE TRANSFER (GLOBAL LISTENER)
+  document.getElementById("approve-transfer-btn").addEventListener("click", async () => {
+  
+      if (!activeTransfer.id) {
+          alert("No transfer ID found.");
+          return;
+      }
+  
+      const resp = await fetch("/api/transfer/approve/", {
+          method: "POST",
+          headers: {
+              "Content-Type": "application/json",
+              "X-CSRFToken": document.cookie.match(/csrftoken=([^;]+)/)[1]
+          },
+          body: JSON.stringify({ id: activeTransfer.id })
+      });
+  
+      const data = await resp.json();
+  
+      if (resp.ok) {
+          alert("Transfer approved!");
+          transferModal.hide();
+          location.reload();
+      } else {
+          alert("Approval failed: " + data.error);
+      }
+  });
+  
+  // EXECUTE TRANSFER
+  document.addEventListener("click", async e => {
+      if (e.target.id !== "confirm-transfer-btn") return;
+  
+      const qty = parseInt(document.getElementById("transfer-qty").value, 10);
+      const notes = document.getElementById("transfer-notes").value.trim();
+  
+      const payload = {
+          product_id: activeTransfer.product_id,
+          from_branch: activeTransfer.from_branch,
+          to_branch: activeTransfer.to_branch,
+          qty,
+          reference: notes || "Manual transfer"
+      };
+  
+      const resp = await fetch("/api/transfer/execute/", {
+          method: "POST",
+          headers: {
+              "Content-Type": "application/json",
+              "X-CSRFToken": document.cookie.match(/csrftoken=([^;]+)/)[1]
+          },
+          body: JSON.stringify(payload)
+      });
+  
+      const data = await resp.json();
+  
+      if (resp.ok) {
+          alert(`Transferred ${data.qty} units of ${data.product}`);
+          transferModal.hide();
+          location.reload();
+      } else {
+          alert("Transfer failed: " + data.error);
+      }
+  });
+  </script>
+
+
+
+<script>
+  // Kenyan Shillings formatter
+  function fmtKES(n) {
+    try {
+      return new Intl.NumberFormat('en-KE', {style: 'currency', currency: 'KES', maximumFractionDigits: 2})
+               .format(Number(n||0));
+    } catch(e) { return 'KSh ' + Number(n||0).toFixed(2); }
+  }
+
+  // --------------------
+  // Profit Sparkline
+  // --------------------
+  (function(){
+    const labels = JSON.parse(document.getElementById('pfLabels').textContent || '[]');
+    const values = JSON.parse(document.getElementById('pfValues').textContent || '[]');
+    const ctx = document.getElementById('profitSpark');
+    if (!ctx || !labels.length) return;
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          data: values,
+          label: 'Profit',
+          borderColor: '#20c997',
+          backgroundColor: 'rgba(32,201,151,0.18)',
+          tension: .35, fill: true, pointRadius: 0
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false }},
+        scales: { y: { beginAtZero: true }},
+        animation: { duration: 700 }
+      }
+    });
+  })();
+
+  // --------------------
+  // Forecast vs Actual (Units)
+  // --------------------
+  (function(){
+    const labels = JSON.parse(document.getElementById('fcLabels').textContent || '[]');
+    const actual = JSON.parse(document.getElementById('fcActual').textContent || '[]');
+    const pred   = JSON.parse(document.getElementById('fcPred').textContent || '[]');
+    const ctx = document.getElementById('fcChart');
+    if (!ctx || !labels.length) return;
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'Actual (Units)',
+            data: actual,
+            borderColor: '#0d6efd',
+            backgroundColor: 'rgba(13,110,253,.12)',
+            tension: .35, fill: true
+          },
+          {
+            label: 'Forecast (Units)',
+            data: pred,
+            borderColor: '#6f42c1',
+            backgroundColor: 'rgba(111,66,193,.10)',
+            tension: .35, fill: true, borderDash: [6, 4]
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        scales: { y: { beginAtZero: true }},
+        animation: { duration: 800 },
+        plugins: { legend: { position: 'top' } }
+      }
+    });
+  })();
+
+  // --------------------
+  // Stock Cover Gauge (Doughnut)
+  // --------------------
+  (function(){
+    const cover  = JSON.parse(document.getElementById('gaugeCover').textContent);   // number|null
+    const target = JSON.parse(document.getElementById('gaugeTarget').textContent);  // number
+    const ctx = document.getElementById('coverGauge');
+    if (!ctx) return;
+
+    const pct = (typeof cover === 'number' && target)
+      ? Math.min(100, Math.max(0, Math.round((cover / target) * 100)))
+      : 0;
+    const col = (cover === null) ? '#6c757d'
+              : (cover < 3 ? '#dc3545'
+              : (cover < 7 ? '#ffc107' : '#198754'));
+
+    new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['Cover', 'Gap'],
+        datasets: [{ data: [pct, 100 - pct], backgroundColor: [col, 'rgba(220,220,220,.3)'], borderWidth: 0 }]
+      },
+      options: { cutout: '75%', plugins: { legend: { display: false }, tooltip: { enabled: false } } },
+      plugins: [{
+        id: 'center-text',
+        afterDraw(chart){
+          const {ctx, chartArea: {width, height}} = chart;
+          ctx.save();
+          ctx.font = '600 20px system-ui, -apple-system, Segoe UI, Roboto';
+          ctx.fillStyle = '#6c757d';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          const txt = (typeof cover === 'number') ? `${cover.toFixed(1)} d` : 'n/a';
+          ctx.fillText(txt, width/2, height/2);
+        }
+      }]
+    });
+  })();
+
+  // --------------------
+  // Sales Chart (Last 14 Days)
+  // --------------------
+  (function(){
+    const labels = JSON.parse(document.getElementById('salesLabels').textContent || '[]');
+    const values = JSON.parse(document.getElementById('salesValues').textContent || '[]');
+    const ctx = document.getElementById('salesChart');
+    if (!ctx || !labels.length) return;
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Revenue',
+          data: values,
+          borderColor: '#0d6efd',
+          backgroundColor: 'rgba(13,110,253,0.12)',
+          tension: .35, fill: true, pointRadius: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        scales: { y: { beginAtZero: true }},
+        plugins: { legend: { display: false }},
+        animation: { duration: 700 }
+      }
+    });
+  })();
+
+  // --------------------
+  // Branch Comparison (Revenue) - Bar
+  // --------------------
+  (function(){
+    const raw = JSON.parse(document.getElementById('branchComp').textContent || '[]');
+    const ctx = document.getElementById('branchChart');
+    if (!ctx || !raw.length) return;
+    const labels = raw.map(r => r['branch__name'] || r['branch_name'] || 'Unknown');
+    const values = raw.map(r => Number(r.revenue || 0));
+    new Chart(ctx, {
+      type: 'bar',
+      data: { labels, datasets: [{ label: 'Revenue', data: values, backgroundColor: 'rgba(25, 135, 84, 0.35)', borderColor: '#198754', borderWidth: 1, borderRadius: 4 }] },
+      options: { responsive: true, scales: { y: { beginAtZero: true }}, plugins: { legend: { display: false }}, animation: { duration: 700 } }
+    });
+  })();
+
+  // --------------------
+  // NEW: 30‑day Revenue + Profit Trend
+  // --------------------
+  (function(){
+    const labels = JSON.parse(document.getElementById('tr30Labels').textContent || '[]');
+    const rev = JSON.parse(document.getElementById('tr30Revenue').textContent || '[]');
+    const prof = JSON.parse(document.getElementById('tr30Profit').textContent || '[]');
+    const ctx = document.getElementById('trend30');
+    if (!ctx || !labels.length) return;
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          { label:'Revenue', data: rev,  borderColor:'#0d6efd', backgroundColor:'rgba(13,110,253,.12)', tension:.35, fill:true },
+          { label:'Profit',  data: prof, borderColor:'#198754', backgroundColor:'rgba(25,135,84,.12)', tension:.35, fill:true }
+        ]
+      },
+      options: {
+        responsive: true,
+        scales: { y: { beginAtZero: true }},
+        plugins: { tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${fmtKES(c.parsed.y)}` } } }
+      }
+    });
+  })();
+
+  // --------------------
+  // NEW: 7‑day Branch Forecast (multi-series)
+  // --------------------
+  (function(){
+    const labels = JSON.parse(document.getElementById('fc7Labels').textContent || '[]');
+    const series = JSON.parse(document.getElementById('fc7Series').textContent || '[]');
+    const ctx = document.getElementById('branchForecast');
+    if (!ctx || !labels.length || !series.length) return;
+
+    const palette = ['#0d6efd','#198754','#6f42c1','#fd7e14','#20c997','#dc3545','#0dcaf0','#6610f2'];
+    const datasets = series.map((s, i) => ({
+      label: s.label,
+      data: s.data,
+      borderColor: palette[i % palette.length],
+      backgroundColor: palette[i % palette.length] + '33',
+      tension: .35,
+      fill: true
+    }));
+
+    new Chart(ctx, {
+      type: 'line',
+      data: { labels, datasets },
+      options: {
+        responsive: true,
+        scales: { y: { beginAtZero: true } },
+        plugins: {
+          tooltip: { callbacks: { label: (c)=> `${c.dataset.label}: ${fmtKES(c.parsed.y)}` } },
+          legend: { position: 'bottom' }
+        }
+      }
+    });
+  })();
+
+  // --------------------
+  // Sparklines (Forecasts & Trends)
+  // --------------------
+  (function(){
+    const sparkData = JSON.parse(document.getElementById('sparklineSeries').textContent || '[]');
+    if (!Array.isArray(sparkData) || !sparkData.length) return;
+    sparkData.forEach((series, idx) => {
+      const id = `spark_${idx + 1}`;
+      const el = document.getElementById(id);
+      if (!el) return;
+      new Chart(el, {
+        type: 'line',
+        data: {
+          labels: series.labels || [],
+          datasets: [{ data: series.values || [], borderColor: '#6f42c1', backgroundColor: 'rgba(111,66,193,0.10)', tension: .35, fill: true, pointRadius: 0 }]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: false }},
+          elements: { line: { borderWidth: 1.5 }},
+          scales: { x: { display: false }, y: { display: false } }
+        }
+      });
+    });
+  })();
+
+  // --------------------
+  // Heatmap (Weekday × Hour)
+  // --------------------
+  (function(){
+    const heatRaw = JSON.parse(document.getElementById('heatmapData').textContent || '[]');
+    const ctx = document.getElementById('heatmapChart');
+    if (!ctx || !heatRaw.length) return;
+
+    const maxV = Math.max(1, ...heatRaw.map(d => Number(d.v) || 0));
+    const weekday = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+    new Chart(ctx, {
+      type: 'matrix',
+      data: {
+        datasets: [{
+          label: 'Sales',
+          data: heatRaw.map(d => ({ x: Number(d.x), y: Number(d.y), v: Number(d.v) })),
+          backgroundColor(ctx) {
+            const value = ctx.raw ? ctx.raw.v : 0;
+            const t = Math.max(0.05, value / maxV);
+            return `rgba(13,110,253, ${0.12 + 0.78 * t})`;
+          },
+          borderWidth: 1,
+          borderColor: 'rgba(33,37,41,0.08)',
+          width(ctx) {
+            const a = ctx.chart.chartArea;
+            return a ? Math.max(6, (a.right - a.left) / 24 - 2) : 10;
+          },
+          height(ctx) {
+            const a = ctx.chart.chartArea;
+            return a ? Math.max(12, (a.bottom - a.top) / 7 - 2) : 14;
+          }
+        }]
+      },
+      options: {
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              title: (items) => `Hour: ${items[0].raw.x}:00`,
+              label: (it) => `Day: ${weekday[it.raw.y]} • Total: ${it.raw.v.toFixed(2)}`
+            }
+          }
+        },
+        scales: {
+          x: { type: 'linear', position: 'top', min: 0, max: 23, ticks: { stepSize: 2, callback: v => `${v}:00` }, grid: { display: false } },
+          y: { type: 'linear', reverse: true, min: 0, max: 6, ticks: { stepSize: 1, callback: v => weekday[v] || v }, grid: { display: false } }
+        }
+      }
+    });
+  })();
+</script>
+
+<!-- AI Script -->
+<script>
+  (function () {
+    const form = document.getElementById("ask_ai_form");
+    if (!form) return;
+
+    const input = document.getElementById("ask_ai_input");
+    const resultEl = document.getElementById("ask_ai_result");
+    const submitBtn = form.querySelector('button[type="submit"]');
+
+    function fmtCurrency(x) {
+      const n = Number(x || 0);
+      return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', maximumFractionDigits: 2 }).format(n);
+    }
+
+    function renderTable(headers, rows, rowRenderer) {
+      const th = headers.map(h => `<th>${h}</th>`).join("");
+      const tr = rows.map(r => `<tr>${rowRenderer(r)}</tr>`).join("");
+      return `
+        <div class="table-responsive">
+          <table class="table table-sm table-hover align-middle mb-0">
+            <thead class="table-light"><tr>${th}</tr></thead>
+            <tbody>${tr || `<tr><td colspan="${headers.length}" class="text-center text-muted py-3">No data</td></tr>`}</tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    function renderAskAIResult(data) {
+      if (!data || typeof data !== 'object') {
+        return `<div class="alert alert-danger small">Malformed response.</div>`;
+      }
+      if (data.type === 'error') {
+        return `<div class="alert alert-warning small">${data.error || 'Unknown error'}</div>`;
+      }
+
+      switch (data.type) {
+        case 'top_products': {
+          const rows = data.rows || [];
+          return `
+            <div class="card border-0 shadow-sm">
+              <div class="card-header bg-white"><strong>Top Products</strong></div>
+              <div class="card-body p-0">
+                ${renderTable(
+                  ["SKU", "Product", "Units"],
+                  rows,
+                  r => `
+                    <td>${r.product__sku || '-'}</td>
+                    <td class="text-truncate" style="max-width:260px">${r.product__name || '-'}</td>
+                    <td class="text-end">${r.units ?? 0}</td>
+                  `
+                )}
+              </div>
+            </div>`;
+        }
+
+        case 'low_stock': {
+          const rows = data.rows || [];
+          return `
+            <div class="card border-0 shadow-sm">
+              <div class="card-header bg-white"><strong>Low Stock</strong></div>
+              <div class="card-body p-0">
+                ${renderTable(
+                  ["SKU", "Product", "On Hand"],
+                  rows,
+                  r => `
+                    <td>${r.product__sku || '-'}</td>
+                    <td class="text-truncate" style="max-width:260px">${r.product__name || '-'}</td>
+                    <td class="text-end">${r.on_hand ?? 0}</td>
+                  `
+                )}
+              </div>
+            </div>`;
+        }
+
+        case 'sales_today': {
+          const total = data.total ?? 0;
+          const dateLabel = data.date_label ? ` • <span class="text-muted">${data.date_label}</span>` : '';
+          return `
+            <div class="card border-0 shadow-sm">
+              <div class="card-body">
+                <div class="d-flex align-items-center">
+                  <div class="display-6 me-3 text-primary"><i class="bi bi-cash-coin"></i></div>
+                  <div>
+                    <div class="text-muted small">Sales</div>
+                    <div class="fs-4 fw-semibold">${fmtCurrency(total)}${dateLabel}</div>
+                  </div>
+                </div>
+              </div>
+            </div>`;
+        }
+
+        case 'branch_rank': {
+          const rows = data.rows || [];
+          return `
+            <div class="card border-0 shadow-sm">
+              <div class="card-header bg-white"><strong>Branch Leaderboard</strong></div>
+              <div class="card-body p-0">
+                ${renderTable(
+                  ["Branch", "Revenue"],
+                  rows,
+                  r => `
+                    <td>${r["branch__name"] || r.branch || '-'}</td>
+                    <td class="text-end">${fmtCurrency(r.revenue)}</td>
+                  `
+                )}
+              </div>
+            </div>`;
+        }
+
+        case 'reorder_recommendations': {
+          const rows = data.rows || [];
+          const note = data.branch ? `<div class="small text-muted px-3 pt-2">Branch: <strong>${data.branch}</strong></div>` : '';
+          return `
+            <div class="card border-0 shadow-sm">
+              <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <strong>Reorder Recommendations</strong>
+              </div>
+              ${note}
+              <div class="card-body p-0">
+                ${renderTable(
+                  ["SKU", "Name", "On hand", "Daily Demand", "Cover (days)", "Recommended Qty"],
+                  rows,
+                  r => `
+                    <td>${r.sku}</td>
+                    <td class="text-truncate" style="max-width:240px">${r.name}</td>
+                    <td class="text-end">${r.on_hand}</td>
+                    <td class="text-end">${r.daily_demand}</td>
+                    <td class="text-end">${r.cover === null || r.cover === undefined ? 'n/a' : r.cover.toFixed ? r.cover.toFixed(1) : r.cover}</td>
+                    <td class="text-end fw-semibold">${r.reco_qty}</td>
+                  `
+                )}
+              </div>
+            </div>`;
+        }
+
+        default:
+          return `
+            <div class="card border-0 shadow-sm">
+              <div class="card-header bg-white"><strong>Answer</strong></div>
+              <div class="card-body">
+                <div class="text-muted small">Unrecognized query. Try: “Top products this week”, “Low stock”, “Which branch is best?”, “Sales today”, “What should I reorder?”.</div>
+              </div>
+            </div>`;
+      }
+    }
+
+    form.addEventListener("submit", async function(e){
+      e.preventDefault();
+
+      const q = (input.value || "").trim();
+      if (!q) {
+        resultEl.innerHTML = `<div class="text-danger small">Please type a question.</div>`;
+        return;
+      }
+
+      // Loading UI
+      const btnText = submitBtn.textContent;
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Asking…";
+      resultEl.innerHTML = `<div class="small text-muted">Working on it…</div>`;
+
+      try {
+        const formData = new FormData();
+        formData.append("question", q);
+
+        const response = await fetch("{% url 'accounts:ask-ai' %}", {
+          method: "POST",
+          body: formData,
+          headers: { "X-Requested-With": "XMLHttpRequest" },
+          credentials: "same-origin"
+        });
+
+        let data;
+        const ct = response.headers.get("content-type") || "";
+        if (ct.includes("application/json")) {
+          data = await response.json();
+        } else {
+          const raw = await response.text();
+          data = { type: response.ok ? "ok" : "error", raw };
+        }
+
+        if (!response.ok) {
+          if (response.status === 429) {
+            resultEl.innerHTML = `<div class="alert alert-warning small">The AI service is currently rate-limited or out of quota. Please try again later.</div>`;
+            return;
+          }
+          resultEl.innerHTML = `<div class="alert alert-danger small">Request failed (${response.status}).</div>`;
+          console.error("ask-ai error:", data);
+          return;
+        }
+
+        resultEl.innerHTML = renderAskAIResult(data);
+
+      } catch (err) {
+        console.error("ask-ai network error:", err);
+        resultEl.innerHTML = `<div class="alert alert-danger small">Network error or server down.</div>`;
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = btnText;
+      }
+    });
+  })();
+</script>
+
+{% endblock %}

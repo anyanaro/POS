@@ -1,0 +1,317 @@
+{% extends "accounts/base.html" %}
+
+{% block dashboard_content %}
+
+<div class="card shadow-sm">
+
+    <div class="card-header bg-white">
+
+        <h4>
+
+            <i class="bi bi-bar-chart-line me-2 text-primary"></i>
+
+            Supplier Price Comparison
+
+            CO-{{ order.id }}
+
+        </h4>
+
+    </div>
+
+    <div class="card-body">
+
+        <!-- SUPPLIER SUMMARY -->
+
+        <div class="card mb-4">
+
+            <div class="card-header">
+
+                <i class="bi bi-people me-2"></i>
+
+                Supplier Summary
+
+            </div>
+
+            <div class="card-body">
+
+                <div class="table-responsive">
+
+                    <table id="supplierComparisonTable" class="table table-bordered table-hover erp-table align-middle w-100">
+
+                        <thead>
+
+                            <tr>
+
+                                <th>Supplier</th>
+                                <th>Quoted Items</th>
+                                <th>Awarded Items</th>
+                                <th>Quoted Value</th>
+                                <th>Status</th>
+                                <th >Actions</th>
+
+                            </tr>
+
+                        </thead>
+
+                        <tbody>
+
+                            {% for item in comparison %}
+
+                            <tr
+
+                            >
+
+                                <td>
+
+                                    {{ item.quotation.supplier }}
+
+                                </td>
+
+                                <td>{{ item.quoted_count }}</td>
+                                <td>{{ item.awarded_count }}</td>
+                                <td data-order="{{ item.total }}">
+                                    KES {{ item.total|floatformat:2 }}
+                                </td>
+
+                                <td data-order="{{ item.quotation.status }}">
+
+                                    {% if item.quotation.status == "DRAFT" %}
+
+                                        <span class="badge bg-secondary">
+
+                                            Draft
+
+                                        </span>
+
+                                    {% elif item.quotation.status == "RECEIVED" %}
+
+                                        <span class="badge bg-info">
+
+                                            Received
+
+                                        </span>
+
+                                    {% elif item.quotation.status == "AWARDED" %}
+
+                                        <span class="badge bg-success">
+
+                                            Awarded
+
+                                        </span>
+
+                                    {% else %}
+
+                                        <span class="badge bg-dark">
+
+                                            {{ item.quotation.status }}
+
+                                        </span>
+
+                                    {% endif %}
+
+                                </td>
+
+                                <td>
+
+                                    <div class="btn-group">
+
+                                       
+                                        {% if item.quotation.status == 'DRAFT' or item.quotation.status == 'SENT' or item.quotation.status == 'RECEIVED' %}
+
+                                        <a href="{% url 'accounts:award-supplier' item.quotation.id %}">
+                                           
+
+                                            <i class="bi bi-trophy me-1"></i>
+
+                                            Award Lowest Items
+
+                                        </a>
+
+                                        {% endif %}
+
+                                        {% if item.quotation.status == 'AWARDED' %}
+
+                                        <a href="{% url 'accounts:generate-purchase-order' item.quotation.id %}">
+
+                                            <i class="bi bi-file-earmark-text me-1"></i>
+
+                                            Generate PO
+
+                                        </a>
+
+                                        {% endif %}
+
+                                    </div>
+
+                                </td>
+
+                            </tr>
+
+                            {% endfor %}
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- ITEM PRICE COMPARISON -->
+
+        <div class="card">
+
+            <div class="card-header">
+
+                <i class="bi bi-list-check me-2"></i>
+
+                Item Price Comparison
+
+            </div>
+
+            <div class="card-body">
+
+                {% for quotation in quotations %}
+
+                <div class="card mb-3">
+
+                    <div class="card-header bg-light">
+
+                        <strong>
+
+                            <i class="bi bi-building me-2"></i>
+
+                            {{ quotation.supplier }}
+
+                        </strong>
+
+                        <span class="ms-3 text-muted">
+
+                            RFQ: {{ quotation.rfq_no }}
+
+                        </span>
+
+                    </div>
+
+                    <div class="card-body p-0">
+
+                        <table class="table table-sm table-bordered mb-0">
+
+                            <thead>
+
+                                <tr>
+
+                                    <th>Product</th>
+                                    <th>Qty</th>
+                                    <th>Unit Price</th>
+                                    <th>Total</th>
+                                    <th>Status</th>
+                                    <th>Lowest</th>
+                                    <th>Actions</th>
+
+                                </tr>
+
+                            </thead>
+
+                            <tbody>
+
+                                {% for line in quotation.lines.all %}
+
+                                <tr>
+
+                                    <td>
+
+                                        {{ line.product }}
+
+                                    </td>
+
+                                    <td>
+
+                                        {{ line.qty|floatformat:2 }}
+
+                                    </td>
+
+                                    <td>
+
+                                        KES {{ line.unit_price|floatformat:2 }}
+
+                                    </td>
+
+                                    <td>
+
+                                        KES {{ line.total_amount|floatformat:2 }}
+
+                                    </td>
+
+                                    <td>
+                                        {% if line.unit_price <= 0 %}
+                                            <span class="badge bg-secondary">Not quoted</span>
+                                        {% elif line.awarded %}
+                                            <span class="badge bg-success">Awarded</span>
+                                        {% else %}
+                                            <span class="badge bg-light text-dark">Not selected</span>
+                                        {% endif %}
+                                    </td>
+
+                                    <td>
+                                        {% if line.id in lowest_line_ids %}
+                                            <span class="badge bg-success">Lowest</span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+
+                                    <td>
+                                        {% if line.id in lowest_line_ids %}
+                                            {% if line.awarded %}
+                                                <span class="badge bg-success">Awarded</span>
+                                            {% else %}
+                                                <a href="{% url 'accounts:award-quotation-line' line.id %}"
+                                                   class="btn btn-sm btn-outline-success">
+                                                    <i class="bi bi-trophy me-1"></i>
+                                                    Award
+                                                </a>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+
+                                </tr>
+
+                                {% empty %}
+
+                                <tr>
+
+                                    <td colspan="7"
+                                        class="text-center text-muted">
+
+                                        No quotation lines available.
+
+                                    </td>
+
+                                </tr>
+
+                                {% endfor %}
+
+                            </tbody>
+
+                        </table>
+
+                    </div>
+
+                </div>
+
+                {% endfor %}
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

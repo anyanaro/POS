@@ -1,0 +1,115 @@
+{% extends "accounts/base.html" %}
+{% load procurement_tags %}
+
+{% block dashboard_content %}
+
+<div class="card shadow-sm">
+
+    <div class="card-header bg-white d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <div>
+            <h4 class="mb-0">
+                <i class="bi bi-diagram-2 me-2 text-primary"></i>
+                Branch Stock Availability
+            </h4>
+            <small class="text-muted">Un-expired stock balances per product, grouped by branch. Tick a quantity to request a transfer into your branch — you can only pick from one source branch at a time.</small>
+        </div>
+        <button type="button" id="btnCreateTransfer" class="btn btn-primary" disabled>
+            <i class="bi bi-arrow-left-right me-1"></i>
+            Create Stock Transfer<span id="selectedCount" class="badge bg-light text-primary ms-1 d-none">0</span>
+        </button>
+    </div>
+
+    <div class="card-body">
+
+        <div class="table-responsive">
+            <table id="branchStockTable" class="table table-hover table-bordered align-middle erp-table w-100">
+                <thead class="table-light">
+                    <tr>
+                        <th>SKU</th>
+                        <th>Product</th>
+                        {% for branch in branches %}
+                        <th class="text-end">{{ branch.name }}</th>
+                        {% endfor %}
+                        <th class="text-end">Total</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for row in rows %}
+                    <tr>
+                        <td>{{ row.sku }}</td>
+                        <td>{{ row.name }}</td>
+                        {% for branch in branches %}
+                        <td class="text-end">
+                            {% with qty=row.branch_qty|get_item:branch.id %}
+                                {% if qty %}
+                                    {% if branch.id == active_branch_id %}
+                                        {{ qty|floatformat:0 }}
+                                    {% else %}
+                                        <div class="form-check form-check-inline justify-content-end m-0">
+                                            <input type="checkbox" class="form-check-input branch-select"
+                                                   data-branch="{{ branch.id }}" data-product="{{ row.id }}">
+                                            <label class="form-check-label ms-1">{{ qty|floatformat:0 }}</label>
+                                        </div>
+                                    {% endif %}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            {% endwith %}
+                        </td>
+                        {% endfor %}
+                        <td class="text-end fw-semibold">{{ row.total|floatformat:0 }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="{{ branches|length|add:3 }}" class="text-center text-muted">
+                            No stock records found.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+(function(){
+    const table = document.getElementById("branchStockTable");
+    const createBtn = document.getElementById("btnCreateTransfer");
+    const countBadge = document.getElementById("selectedCount");
+    const activeBranchId = "{{ active_branch_id|default:'' }}";
+
+    function refresh(){
+        const checked = Array.from(table.querySelectorAll(".branch-select:checked"));
+        const branchId = checked.length ? checked[0].dataset.branch : null;
+
+        table.querySelectorAll(".branch-select").forEach(function(cb){
+            cb.disabled = branchId !== null && cb.dataset.branch !== branchId && !cb.checked;
+        });
+
+        createBtn.disabled = checked.length === 0;
+        countBadge.classList.toggle("d-none", checked.length === 0);
+        countBadge.textContent = checked.length;
+
+        return { branchId, ids: checked.map(cb => cb.dataset.product) };
+    }
+
+    table.addEventListener("change", function(e){
+        if (e.target.matches(".branch-select")) refresh();
+    });
+
+    createBtn.addEventListener("click", function(){
+        const { branchId, ids } = refresh();
+        if (!ids.length || !branchId) return;
+        const params = new URLSearchParams({ products: ids.join(",") });
+        params.set("from_branch", branchId);
+        if (activeBranchId) params.set("to_branch", activeBranchId);
+        window.location.href = "{% url 'accounts:transfer-create' %}?" + params.toString();
+    });
+})();
+</script>
+
+{% endblock %}

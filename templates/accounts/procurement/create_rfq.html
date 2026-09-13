@@ -1,0 +1,131 @@
+{% extends "accounts/base.html" %}
+
+{% block dashboard_content %}
+
+<div class="card shadow-sm">
+
+    <div class="card-header bg-white">
+
+        <h4>
+
+            <i class="bi bi-envelope-paper me-2 text-primary"></i>
+
+            Create RFQ
+
+        </h4>
+
+    </div>
+
+    <div class="card-body">
+
+        <form method="post">
+
+            {% csrf_token %}
+
+            <div class="mb-3">
+
+                <label class="form-label">
+
+                    Consolidated Order
+
+                </label>
+
+                <input
+                    type="text"
+                    class="form-control"
+                    value="CO-{{ order.id }}"
+                    readonly>
+
+            </div>
+
+            <div class="mb-3">
+
+                <label class="form-label">
+                    Suppliers
+                </label>
+            
+                {% for supplier in suppliers %}
+            
+                <div class="form-check">
+            
+                    <input
+                        class="form-check-input"
+                        type="checkbox"
+                        name="suppliers"
+                        value="{{ supplier.id }}"
+                        id="supplier{{ supplier.id }}">
+            
+                    <label
+                        class="form-check-label"
+                        for="supplier{{ supplier.id }}">
+            
+                        {{ supplier }}
+            
+                    </label>
+            
+                </div>
+            
+                {% endfor %}
+            
+            </div>
+
+            <hr>
+
+            <h5>Items</h5>
+
+            <table class="table table-bordered">
+
+                <thead>
+
+                    <tr>
+
+                        <th>Product</th>
+                        <th>Quantity</th>
+
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                    {% for line in order.lines.all %}
+
+                    <tr>
+
+                        <td>
+                            {{ line.product }}
+                        </td>
+
+                        <td>
+                            {{ line.total_qty|floatformat:0 }}
+                        </td>
+
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+            <div class="text-end">
+
+                <button
+                    type="submit"
+                    class="btn btn-primary">
+
+                    <i class="bi bi-check-circle me-1"></i>
+
+                    Create RFQ
+
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+{% endblock %}

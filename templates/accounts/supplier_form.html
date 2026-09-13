@@ -1,0 +1,165 @@
+{% extends "accounts/base.html" %}
+{% block dashboard_content %}
+
+<h4 class="mb-3">{{ mode|title }} Supplier</h4>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <form id="supplier-form" class="row g-3">
+      {% csrf_token %}
+
+      <div class="col-md-3">
+        <label class="form-label">Supplier Code</label>
+        <input
+            class="form-control"
+            value="{{ supplier.code|default:'Auto Generated' }}"
+            readonly>
+    </div>
+
+      <div class="col-md-3">
+        <label class="form-label">BC Number <span class="text-danger">*</span></label>
+        <input class="form-control" id="bc_number" value="{{ supplier.bc_number|default:'' }}" required>
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label">Name <span class="text-danger">*</span></label>
+        <input class="form-control" id="name" value="{{ supplier.name|default:'' }}" required>
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label">Contact person</label>
+        <input class="form-control" id="contact_person" value="{{ supplier.contact_person|default_if_none:'' }}">
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label">Email</label>
+        <input type="email" class="form-control" id="email" value="{{ supplier.email|default_if_none:'' }}">
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label">Phone</label>
+        <input class="form-control" id="phone" value="{{ supplier.phone|default_if_none:'' }}">
+      </div>
+
+      <div class="col-md-4 d-flex align-items-end">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="active" {% if supplier and supplier.active %}checked{% else %}checked{% endif %}>
+          <label class="form-check-label" for="active">Active</label>
+        </div>
+      </div>
+
+      <div class="col-12">
+        <label class="form-label">Address</label>
+        <textarea id="address" class="form-control" rows="3">{{ supplier.address|default_if_none:'' }}</textarea>
+      </div>
+
+      <div class="col-12">
+        <div id="form-errors" class="text-danger small"></div>
+      </div>
+
+      <div class="col-12 d-flex gap-2">
+        <button class="btn btn-primary" type="submit">
+          <i class="bi bi-save me-1"></i> {{ mode|title }}
+        </button>
+      
+        <a href="{% url 'accounts:supplier-manage' %}" class="btn btn-outline-secondary">
+          Cancel
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1080">
+  <div id="toast" class="toast align-items-center text-bg-danger border-0" role="alert" aria-live="assertive" aria-atomic="true">
+    <div class="d-flex">
+      <div id="toast-body" class="toast-body">Error</div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const form = document.getElementById('supplier-form');
+  const errorsEl = document.getElementById('form-errors');
+  const apiUrl = "{{ api_url }}";
+  const mode = "{{ mode }}";
+
+  function getCSRF(){
+    const m = document.cookie.match(/csrftoken=([^;]+)/);
+    return m ? m[1] : '';
+  }
+
+  function payload(){
+    return {
+      bc_number: (document.getElementById('bc_number').value || '').trim(),
+      name: (document.getElementById('name').value || '').trim(),
+      contact_person: (document.getElementById('contact_person').value || '').trim(),
+      email: (document.getElementById('email').value || '').trim(),
+      phone: (document.getElementById('phone').value || '').trim(),
+      address: (document.getElementById('address').value || '').trim(),
+      active: document.getElementById('active').checked
+    };
+  }
+
+  function renderErrors(err){
+    if (!err){ errorsEl.textContent = ""; return; }
+    if (typeof err === 'string'){ errorsEl.textContent = err; showToast(err, 'danger'); return; }
+    if (err.detail){ errorsEl.textContent = err.detail; showToast(err.detail, 'danger'); return; }
+    const parts = [];
+    for (const k in err){ parts.push(`${k}: ${Array.isArray(err[k]) ? err[k].join(', ') : err[k]}`); }
+    const txt = parts.join(' • ');
+    errorsEl.textContent = txt;
+    showToast(txt, 'danger');
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    errorsEl.textContent = "";
+
+    if (!document.getElementById('bc_number').value.trim()) {
+      renderErrors("BC Number is required.");
+      return;
+    }
+
+    const body = JSON.stringify(payload());
+    const method = (mode === 'edit') ? 'PUT' : 'POST';
+
+    try {
+      const resp = await fetch(apiUrl, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCSRF(),
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body,
+        credentials: 'same-origin'
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok){ renderErrors(data); return; }
+
+      const flag = (mode === 'edit') ? 'updated' : 'created';
+      window.location.href = "{% url 'accounts:supplier-manage' %}?toast=" + flag;
+
+    } catch (err) {
+      console.error(err);
+      renderErrors("Network error. Please try again.");
+    }
+  });
+
+  function showToast(message, variant='danger'){
+    const toastEl = document.getElementById('toast');
+    const body = document.getElementById('toast-body');
+    body.textContent = message;
+    toastEl.classList.remove('text-bg-success','text-bg-danger','text-bg-warning','text-bg-info');
+    toastEl.classList.add(`text-bg-${variant}`);
+    const t = new bootstrap.Toast(toastEl, { delay: 2500 });
+    t.show();
+  }
+})();
+</script>
+
+{% endblock %}

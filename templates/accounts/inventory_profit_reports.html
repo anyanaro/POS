@@ -1,0 +1,65 @@
+{% extends "accounts/base.html" %}
+{% load humanize %}
+
+{% block dashboard_content %}
+<h3 class="mt-3">Inventory and Profit Reports</h3>
+<p class="text-muted">Stock valuation, current inventory worth, gross profit, and reorder analysis.</p>
+
+<div class="card shadow-sm my-4">
+  <div class="card-header bg-white"><strong>Report Filters</strong></div>
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-sm-4 col-lg-3">
+        <label class="form-label">From</label>
+        <input type="date" name="from" class="form-control" value="{{ report_from|date:'Y-m-d' }}">
+      </div>
+      <div class="col-sm-4 col-lg-3">
+        <label class="form-label">To</label>
+        <input type="date" name="to" class="form-control" value="{{ report_to|date:'Y-m-d' }}">
+      </div>
+      <div class="col-sm-4 col-lg-3">
+        <label class="form-label">Branch</label>
+        <select name="branch" class="form-select">
+          <option value="">All branches</option>
+          {% for branch in report_branches %}
+          <option value="{{ branch.id }}" {% if report_branch == branch.id|stringformat:'s' %}selected{% endif %}>{{ branch.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-sm-12 col-lg-3 d-flex gap-2">
+        <button class="btn btn-outline-primary" type="submit"><i class="bi bi-funnel me-1"></i> Apply filters</button>
+        <a class="btn btn-outline-secondary" href="{% url 'accounts:inventory-profit-reports' %}">Clear</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-12 col-md-4"><div class="card border-success h-100"><div class="card-body"><div class="text-muted small">Current Inventory Worth</div><div class="fs-4 fw-semibold">{{ current_worth|floatformat:2|intcomma }}</div><div class="small text-muted">{{ current_units|floatformat:2|intcomma }} units on hand</div></div></div></div>
+  <div class="col-12 col-md-4"><div class="card border-primary h-100"><div class="card-body"><div class="text-muted small">Gross Revenue</div><div class="fs-4 fw-semibold">{{ gross_revenue_total|floatformat:2|intcomma }}</div><div class="small text-muted">Selected date range</div></div></div></div>
+  <div class="col-12 col-md-4"><div class="card border-warning h-100"><div class="card-body"><div class="text-muted small">Gross Profit</div><div class="fs-4 fw-semibold">{{ gross_profit_total|floatformat:2|intcomma }}<span class="fs-6 text-muted ms-1">({{ gross_margin_pct|floatformat:1 }}%)</span></div><div class="small text-muted">Revenue less recorded line cost</div></div></div></div>
+</div>
+
+  <div class="row g-4 report-grid">
+  <div class="col-12 col-xl-6">
+    <div class="card h-100 shadow-sm"><div class="card-header bg-white"><strong>Stock Valuation</strong></div><div class="card-body p-0"><div class="table-responsive"><table class="table table-sm table-hover align-middle mb-0 erp-table w-100">
+      <thead class="table-light"><tr><th>Item</th><th>Branch</th><th class="text-end">Qty</th><th class="text-end">Cost</th><th class="text-end">Value</th></tr></thead>
+      <tbody>{% for row in valuation_rows %}<tr><td><strong>{{ row.sku }}</strong><div class="small text-muted">{{ row.name }}<br>Batch: {{ row.batch }}</div></td><td>{{ row.branch }}</td><td class="text-end">{{ row.qty|floatformat:2|intcomma }}</td><td class="text-end">{{ row.unit_cost|floatformat:2|intcomma }}</td><td class="text-end fw-semibold">{{ row.value|floatformat:2|intcomma }}</td></tr>{% empty %}<tr><td colspan="5" class="text-center text-muted py-3">No stock valuation data</td></tr>{% endfor %}</tbody>
+    </table></div></div></div>
+  </div>
+
+  <div class="col-12 col-xl-6">
+    <div class="card h-100 shadow-sm"><div class="card-header bg-white"><strong>Gross Profit Report</strong></div><div class="card-body p-0"><div class="table-responsive"><table class="table table-sm table-hover align-middle mb-0 erp-table w-100">
+      <thead class="table-light"><tr><th>Item</th><th class="text-end">Units</th><th class="text-end">Revenue</th><th class="text-end">COGS</th><th class="text-end">Profit</th></tr></thead>
+      <tbody>{% for row in gross_profit_rows %}<tr><td><strong>{{ row.sku }}</strong><div class="small text-muted">{{ row.name }}</div></td><td class="text-end">{{ row.units|floatformat:2|intcomma }}</td><td class="text-end">{{ row.revenue|floatformat:2|intcomma }}</td><td class="text-end">{{ row.cogs|floatformat:2|intcomma }}</td><td class="text-end fw-semibold">{{ row.gross_profit|floatformat:2|intcomma }}<div class="small text-muted">{{ row.margin_pct|floatformat:1 }}%</div></td></tr>{% empty %}<tr><td colspan="5" class="text-center text-muted py-3">No gross profit data</td></tr>{% endfor %}</tbody>
+    </table></div></div></div>
+  </div>
+
+  <div class="col-12">
+    <div class="card shadow-sm"><div class="card-header bg-white"><strong>Reorder Analysis</strong><span class="small text-muted ms-2">Items at or below their configured reorder level</span></div><div class="card-body p-0"><div class="table-responsive"><table class="table table-sm table-hover align-middle mb-0">
+      <thead class="table-light"><tr><th>SKU</th><th>Product</th><th class="text-end">On Hand</th><th class="text-end">Reorder Level</th><th class="text-end">Shortfall</th><th class="text-end">Suggested Qty</th><th class="text-end">Est. Cost</th></tr></thead>
+      <tbody>{% for row in reorder_rows %}<tr class="{% if row.on_hand <= 0 %}table-danger{% else %}table-warning{% endif %}"><td>{{ row.sku }}</td><td>{{ row.name }}</td><td class="text-end">{{ row.on_hand|floatformat:2|intcomma }}</td><td class="text-end">{{ row.reorder_level|floatformat:2|intcomma }}</td><td class="text-end">{{ row.shortfall|floatformat:2|intcomma }}</td><td class="text-end fw-semibold">{{ row.reorder_qty|floatformat:2|intcomma }}</td><td class="text-end">{{ row.average_cost|floatformat:2|intcomma }}</td></tr>{% empty %}<tr><td colspan="7" class="text-center text-muted py-3"><strong>No items currently require reorder.</strong><br><small>{{ reorder_configured_count }} of {{ active_product_count }} active products have a configured reorder level. Set reorder levels in Product Maintenance to activate this report.</small><br><a href="{% url 'accounts:products' %}" class="btn btn-sm btn-outline-primary mt-2">Configure Product Reorder Levels</a></td></tr>{% endfor %}</tbody>
+    </table></div></div></div>
+  </div>
+</div>
+{% endblock %}

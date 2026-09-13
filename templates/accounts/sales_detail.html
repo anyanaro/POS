@@ -1,0 +1,118 @@
+{% extends "accounts/base.html" %}
+{% block dashboard_content %}
+{% load humanize %}
+
+<div class="d-flex justify-content-between align-items-center">
+  <h4 class="mb-0">Sale Receipt</h4>
+  <div class="d-flex gap-2">
+    {% if header.status == "REVERSED" %}
+      <span class="badge bg-danger">REVERSED</span>
+    {% else %}
+      <span class="badge bg-success">{{ header.status }}</span>
+    {% endif %}
+    <button class="btn btn-outline-secondary btn-sm" onclick="window.print()">
+      <i class="bi bi-printer me-1"></i> Print
+    </button>
+  </div>
+</div>
+
+<div class="d-flex gap-2 my-3">
+  <a class="btn btn-outline-secondary btn-sm" href="{% url 'accounts:sales-export-csv' %}?from={{ from }}&to={{ to }}&status={{ status }}">CSV</a>
+  <a class="btn btn-outline-success btn-sm" href="{% url 'accounts:sales-export-excel' %}?from={{ from }}&to={{ to }}&status={{ status }}">Excel</a>
+</div>
+
+<hr class="my-3">
+<div class="row g-3">
+  <div class="col-md-6">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="d-flex justify-content-between"><div class="text-muted small">Sale ID</div><div class="small text-monospace">{{ header.sale_id }}</div></div>
+        <div class="d-flex justify-content-between"><div class="text-muted small">Branch</div><div class="small">{{ header.branch.name }}</div></div>
+        <div class="d-flex justify-content-between"><div class="text-muted small">Cashier</div><div class="small">{{ header.cashier.username }}</div></div>
+        <div class="d-flex justify-content-between"><div class="text-muted small">POS</div><div class="small">{{ header.pos_terminal }}</div></div>
+        <div class="d-flex justify-content-between"><div class="text-muted small">Created</div><div class="small">{{ header.created_at|date:"Y-m-d H:i" }}</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-6">
+    {% if reversal %}
+    <div class="card border-danger shadow-sm">
+      <div class="card-header bg-white text-danger"><strong>Reversed</strong></div>
+      <div class="card-body">
+        <div class="d-flex justify-content-between"><div class="text-muted small">By</div><div class="small">{{ reversal.reversed_by.username }}</div></div>
+        <div class="d-flex justify-content-between"><div class="text-muted small">At</div><div class="small">{{ reversal.created_at|date:"Y-m-d H:i" }}</div></div>
+        {% if reversal.reason %}
+        <div class="mt-2">
+          <div class="text-muted small">Reason</div>
+          <div class="small">{{ reversal.reason }}</div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% else %}
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="text-muted small">Status</div>
+        <div class="small">{{ header.status }}</div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card shadow-sm mt-3">
+  <div class="card-header bg-white"><strong>Lines</strong></div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>SKU</th>
+            <th>Name</th>
+            <th>Batch</th>
+            <th>Expiry</th>
+            <th class="text-end">Qty</th>
+            <th class="text-end">Unit Price</th>
+            <th class="text-end">Discount</th>
+            <th class="text-end">Line Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for l in lines %}
+          <tr>
+            <td class="text-monospace">{{ l.product.sku }}</td>
+            <td class="text-truncate" style="max-width:240px">{{ l.product.name }}</td>
+            <td>{{ l.batch.batch_no|default:"-" }}</td>
+            <td>{{ l.batch.expiry_date|date:"Y-m-d"|default:"-" }}</td>
+            <td class="text-end">{{ l.qty|floatformat:0 }}</td>
+            <td class="text-end">{{ l.unit_price|floatformat:2|intcomma }}</td>
+            <td class="text-end">{{ l.discount|floatformat:2|intcomma }}</td>
+            <td class="text-end">{{ l.line_total|floatformat:2|intcomma }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="8" class="text-center text-muted py-3">No lines</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card-footer bg-white">
+    <div class="d-flex justify-content-between"><div class="text-muted small">Subtotal</div><div>{{ subtotal|floatformat:2|intcomma }}</div></div>
+    <div class="d-flex justify-content-between"><div class="text-muted small">Discount</div><div>{{ discount_total|floatformat:2|intcomma }}</div></div>
+    <div class="d-flex justify-content-between"><div class="text-muted small">Tax</div><div>{{ tax_total|floatformat:2|intcomma }}</div></div>
+    <hr class="my-2">
+    <div class="d-flex justify-content-between"><div class="fs-5 fw-semibold">Total</div><div class="fs-5 fw-bold text-primary">{{ grand_total|floatformat:2|intcomma }}</div></div>
+  </div>
+</div>
+
+<style>
+@media print {
+  .navbar, .sidebar, .btn, .pagination, .alert { display: none !important; }
+  .card, .table { box-shadow: none !important; }
+  body { background: #fff; }
+}
+</style>
+
+{% endblock %}

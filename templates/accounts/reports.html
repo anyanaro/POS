@@ -1,0 +1,125 @@
+{% extends "accounts/base.html" %}
+{% block dashboard_content %}
+{% load humanize %}
+
+<h3 class="mt-3">Reports</h3>
+<p class="text-muted">Pick a date range and export CSV/Excel.</p>
+
+<form method="get" class="row g-2 my-2">
+  <div class="col-auto">
+    <input type="date" name="from" class="form-control" value="{{ request.GET.from }}">
+  </div>
+  <div class="col-auto">
+    <input type="date" name="to" class="form-control" value="{{ request.GET.to }}">
+  </div>
+  <div class="col-auto">
+    <button class="btn btn-primary">Apply</button>
+  </div>
+  <div class="col-auto">
+    <button type="submit" name="export" value="csv" class="btn btn-outline-success" href="{% url 'accounts:sales-export-csv' %}?from={{ from }}&to={{ to }}&status={{ status }}">Export CSV</button>
+    <button type="submit" name="export" value="excel" class="btn btn-outline-primary" href="{% url 'accounts:sales-export-excel' %}?from={{ from }}&to={{ to }}&status={{ status }}">Export Excel</button>
+  </div>
+</form>
+{# Summary banner #}
+<div class="alert alert-light border d-flex flex-wrap align-items-center gap-2 my-3">
+  <div>
+    <span class="fw-semibold">{{ row_count }}</span> row{{ row_count|pluralize }}
+    <span class="text-muted">for</span>
+    <span class="fw-semibold">{{ from }}</span>
+    <span class="text-muted">→</span>
+    <span class="fw-semibold">{{ to }}</span>
+    <span class="text-muted">in</span>
+    <span class="fw-semibold">{{ branch_name }}</span>.
+    {% if q %}
+      <span class="text-muted">Filter:</span> “<span class="fst-italic">{{ q }}</span>”.
+    {% endif %}
+  </div>
+  <div class="ms-auto d-flex gap-2">
+    <a class="btn btn-sm btn-outline-secondary" href="{% url 'accounts:reports' %}">Clear filters</a>
+  </div>
+</div>
+
+{# Empty state if no rows #}
+{% if row_count == 0 %}
+  <div class="card shadow-sm">
+    <div class="card-body text-center py-5">
+      <div class="display-6 mb-2">No results</div>
+      <p class="text-muted mb-4">
+        Try adjusting the date range, clearing the search term, or switching branch.
+      </p>
+      <div class="d-flex justify-content-center gap-2">
+        <a class="btn btn-outline-primary" href="{% url 'accounts:reports' %}?from={{ from }}&to={{ to }}">Refresh</a>
+        <a class="btn btn-outline-secondary" href="{% url 'accounts:reports' %}">All dates</a>
+      </div>
+    </div>
+  </div>
+{% else %}
+  <div class="card mt-3">
+    <div class="card-body table-responsive">
+      <table class="table table-sm align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Date</th>
+            <th>Time</th>
+            <th>Branch</th>
+            <th>SKU</th>
+            <th>Product</th>
+            <th>Batch</th>
+            <th>Expiry</th>
+            <th class="text-end">Qty</th>
+            <th>Reason</th>
+            <th>Reference</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for x in queryset %}
+          {% with d=x.created_at|date:"Y-m-d" t=x.created_at|date:"H:i:s" %}
+          <tr>
+            <td>{{ d }}</td>
+            <td>{{ t }}</td>
+            <td>{{ x.branch.name }}</td>
+            <td class="text-monospace">{{ x.product.sku }}</td>
+            <td>{{ x.product.name }}</td>
+            <td>{% if x.batch_id %}{{ x.batch.batch_no }}{% else %}-{% endif %}</td>
+            <td>{% if x.batch_id and x.batch.expiry_date %}{{ x.batch.expiry_date }}{% else %}-{% endif %}</td>
+            <td class="text-end">{{ x.qty_change|floatformat:0 }}</td>
+            <td>{{ x.reason }}</td>
+            <td>{{ x.reference|default:"-" }}</td>
+          </tr>
+          {% endwith %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endif %}
+
+{# Optional: show daily summary even when there are no rows in the slice #}
+{% if daily %}
+  <div class="card mt-3">
+    <div class="card-body table-responsive">
+      <h6 class="mb-2">Daily Summary</h6>
+      <table class="table table-sm align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Date</th>
+            <th class="text-end">Qty IN</th>
+            <th class="text-end">Qty OUT</th>
+            <th class="text-end">Net</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in daily %}
+          <tr>
+            <td>{{ r.date }}</td>
+            <td class="text-end">{{ r.qty_in_sum|floatformat:0|intcomma |default:"0" }}</td>
+            <td class="text-end">{{ r.qty_out_sum|floatformat:0|intcomma |default:"0" }}</td>
+            <td class="text-end">{{ r.net_sum|floatformat:0|intcomma |default:"0" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}

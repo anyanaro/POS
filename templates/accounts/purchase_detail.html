@@ -1,0 +1,83 @@
+{% extends "accounts/base.html" %}
+{% load static %}
+
+{% block dashboard_content %}
+<div class="container-xxl">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h3 class="mb-1">Purchase <span class="text-muted">PUR-{{ header.purchase_id|slice:":8" }}</span></h3>
+      <div class="small text-muted">
+        Date: {{ header.purchase_date }} • Branch: {{ header.branch.name }} •
+        {% if header.supplier %} Supplier: {{ header.supplier.name }} •{% endif %}
+        Ref: {{ header.reference|default:"—" }}
+      </div>
+    </div>
+    <a href="{% url 'accounts:purchases' %}" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left me-1"></i>Back to list
+    </a>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <div class="table-responsive">
+        <table id="purchaseDetailTable" class="table table-sm table-hover align-middle erp-table w-100">
+          <thead class="table-light">
+            <tr>
+              <th class="no-sort">SKU / Name</th>
+              <th>Batch</th>
+              <th>Expiry</th>
+              <th class="text-end">Qty</th>
+              <th class="text-end">Cost</th>
+              <th class="text-end">Line Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for l in lines %}
+            <tr>
+              <td>
+                <div class="fw-semibold">{{ l.product.sku }}</div>
+                <div class="small text-muted">{{ l.product.name }}</div>
+              </td>
+              <td>{% if l.batch_id %}
+                {{ l.batch.batch_no }}
+              {% else %}
+                -
+              {% endif %}</td>
+              <td>{% if l.batch_id and l.batch.expiry_date %}
+                {{ l.batch.expiry_date }}
+              {% else %}
+                -
+              {% endif %}</td>
+              <td
+                class="text-end"
+                data-order="{{ l.qty }}"
+            >
+                {{ l.qty|floatformat:0 }}
+            </td>
+            <td
+                class="text-end"
+                data-order="{{ l.buying_cost }}"
+            >
+                {{ l.buying_cost|floatformat:2 }}
+                <td
+                class="text-end"
+                data-order="{{ l.line_total }}"
+            >
+                {{ l.line_total|floatformat:2 }}
+            </td>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th colspan="5" class="text-end">Total</th>
+              <th class="text-end">
+                {{ total|floatformat:2 }}
+            </th>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

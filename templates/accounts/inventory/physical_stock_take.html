@@ -1,0 +1,20 @@
+{% extends "accounts/base.html" %}
+{% block dashboard_content %}
+<div class="container-fluid">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div><h3><i class="bi bi-clipboard2-check text-primary me-2"></i>Physical Stock Take</h3><div class="text-muted">Branch: {{ branch }}</div></div>
+    <a class="btn btn-outline-primary" href="{% url 'accounts:physical-stock-take-export' %}"><i class="bi bi-file-earmark-excel me-1"></i>Export Count Sheet</a>
+  </div>
+  <div class="alert alert-info"><strong>Workflow:</strong> export the current batch snapshot, enter physical quantities in Excel, then upload it below. Only variances are posted to stock and ledger.</div>
+  <div class="card mb-4"><div class="card-body"><form method="post" enctype="multipart/form-data" class="row g-3 align-items-end">{% csrf_token %}<div class="col-md-8"><label class="form-label">Completed stock-take workbook</label><input type="file" name="file" class="form-control" accept=".xlsx" required></div><div class="col-md-4"><button class="btn btn-primary w-100"><i class="bi bi-eye me-1"></i>Preview Adjustments</button></div></form></div></div>
+
+  {% if preview %}
+    <div class="card border-warning mb-4">
+      <div class="card-header bg-warning-subtle d-flex justify-content-between align-items-center"><strong>Pending adjustment preview</strong><span class="badge bg-warning text-dark">{{ preview.changes|length }} changes</span></div>
+      <div class="table-responsive"><table class="table table-sm table-hover mb-0"><thead><tr><th>Batch</th><th>Product</th><th class="text-end">System Qty</th><th class="text-end">Physical Qty</th><th class="text-end">Adjustment</th></tr></thead><tbody>{% for change in preview.changes %}<tr><td>{{ change.batch_no }} <small class="text-muted">#{{ change.batch_id }}</small></td><td>{{ change.product }}</td><td class="text-end">{{ change.system_qty }}</td><td class="text-end">{{ change.physical_qty }}</td><td class="text-end {% if change.variance|first == '-' %}text-danger{% else %}text-success{% endif %}">{{ change.variance }}</td></tr>{% endfor %}</tbody></table></div>
+      <div class="card-body d-flex gap-2"><form method="post" action="{% url 'accounts:physical-stock-take-approve' %}">{% csrf_token %}<button class="btn btn-success"><i class="bi bi-check-circle me-1"></i>Approve and Post Adjustments</button></form><form method="post" action="{% url 'accounts:physical-stock-take-cancel' %}">{% csrf_token %}<button class="btn btn-outline-secondary">Cancel Preview</button></form></div>
+    </div>
+  {% endif %}
+  <div class="card"><div class="card-header">Current batch snapshot</div><div class="table-responsive"><table class="table table-sm table-hover align-middle erp-table"><thead><tr><th>Batch ID</th><th>Product</th><th>Batch</th><th>Expiry</th><th class="text-end">System Qty</th></tr></thead><tbody>{% for batch in batches %}<tr><td>{{ batch.id }}</td><td>{{ batch.product }}</td><td>{{ batch.batch_no }}</td><td>{{ batch.expiry_date|default:"-" }}</td><td class="text-end">{{ batch.qty_on_hand|floatformat:2 }}</td></tr>{% empty %}<tr><td colspan="5" class="text-center text-muted">No stock batches found.</td></tr>{% endfor %}</tbody></table></div></div>
+</div>
+{% endblock %}

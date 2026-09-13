@@ -1,0 +1,98 @@
+{% extends "accounts/base.html" %}
+{% block dashboard_content %}
+
+<div class="card shadow-sm">
+
+    <div class="card-header bg-white">
+
+        <h4>
+            <i class="bi bi-truck me-2 text-warning"></i>
+            Goods Receipts
+        </h4>
+
+    </div>
+
+    <div class="card-body table-responsive">
+
+        <table id="goodsReceiptsTable" class="table table-hover erp-table align-middle w-100">
+
+            <thead>
+
+                <tr>
+                    <th>GRN</th>
+                    <th>Supplier</th>
+                    <th>Branch</th>
+                    <th>Status</th>
+                    <th class="no-sort text-end">Actions</th>
+                </tr>
+
+            </thead>
+
+            <tbody>
+
+                {% for receipt in receipts %}
+            
+                <tr>
+            
+                    <td>
+            
+                        <a href="{% url 'accounts:goods-receipt-detail' receipt.id %}">
+            
+                            {{ receipt.grn_no }}
+            
+                        </a>
+            
+                    </td>
+            
+                    <td>
+            
+                        {{ receipt.supplier }}
+            
+                    </td>
+            
+                    <td>
+            
+                        {{ receipt.branch }}
+            
+                    </td>
+            
+                    <td data-order="{{ receipt.status }}">
+
+                        <span class="badge bg-warning text-dark">
+                            {{ receipt.status }}
+                        </span>
+                    
+                    </td>
+                    <td class="text-end">
+
+                        <a href="{% url 'accounts:goods-receipt-detail' receipt.id %}" class="btn btn-sm btn-outline-primary">
+                   
+                           <i class="bi bi-eye"></i>
+                   
+                           View
+                   
+                       </a>
+                   
+                   </td>
+            
+                </tr>
+                {% empty %}
+
+                <tr>
+                    <td colspan="5" class="text-center text-muted py-4">
+                        No goods receipts found
+                    </td>
+                </tr>
+
+                {% endfor %}
+            
+            
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+{% endblock %}

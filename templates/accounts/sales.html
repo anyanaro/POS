@@ -1,0 +1,3099 @@
+{% extends "accounts/base.html" %}
+{% block dashboard_content %}
+{% load humanize %}
+
+<h3 class="mt-3">Sales</h3>
+
+<!-- ================= KPIs ================= -->
+<div class="row g-3 my-2">
+    <div class="col-md-4">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <div class="text-muted small">Revenue (30 days)</div>
+                <div class="fs-4 fw-semibold">{{ revenue|floatformat:2|intcomma }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <div class="text-muted small">Orders (30 days)</div>
+                <div class="fs-4 fw-semibold">{{ orders }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <div class="text-muted small">AOV</div>
+                <div class="fs-4 fw-semibold">{{ aov|floatformat:2|intcomma }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ================= POS AREA ================= -->
+<div class="row g-3">
+
+    <!-- LEFT COLUMN: SEARCH -->
+    <div class="col-lg-6">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white d-flex align-items-center gap-2">
+                <strong>Find Product</strong>
+                <span class="text-muted small">· scan barcode or search SKU/name</span>
+            </div>
+
+            <div class="card-body">
+
+                <!-- Search Form -->
+                <form id="search-form" class="row g-2 align-items-end">
+                    <div class="col-8">
+                        <label class="form-label">Barcode / Search</label>
+                        <input id="search-input" class="form-control" placeholder="Scan barcode, SKU or type name…" autofocus>
+                    </div>
+
+                    <div class="col-4">
+                        <label class="form-label">Qty</label>
+                        <input type="number" id="search-qty" class="form-control" value="1" min="1" step="1">
+                    </div>
+
+                    <div class="col-12 d-flex gap-2">
+                        <button class="btn btn-outline-primary" type="submit">
+                            <i class="bi bi-search me-1"></i> Add
+                        </button>
+
+                        <button class="btn btn-outline-secondary" type="button" id="clear-search">
+                            Clear
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Results -->
+                <div class="mt-3">
+                    <div class="text-muted small mb-1">Matches</div>
+
+                    <div class="table-responsive" style="max-height:280px; overflow:auto;">
+                        <table class="table table-sm table-hover align-middle mb-0 erp-table">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>SKU</th>
+                                    <th>Name</th>
+                                    <th class="text-end">Action</th>
+                                </tr>
+                            </thead>
+
+                            <tbody id="result-body">
+                                <tr>
+                                    <td colspan="3" class="text-center text-muted py-3">Search to see results…</td>
+                                </tr>
+                            </tbody>
+
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Top Products -->
+        <div class="card shadow-sm my-3">
+            <div class="card-header bg-white">
+                <strong>Top 10 Products by Units (30 days)</strong>
+            </div>
+
+            <div class="card-body table-responsive">
+                <table class="table table-sm table-hover align-middle erp-table">
+                    <thead>
+                        <tr>
+                            <th>SKU</th>
+                            <th>Name</th>
+                            <th class="text-end">Units</th>
+                            <th class="text-end">Revenue</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {% for p in top_products %}
+                            <tr>
+                                <td>{{ p.product__sku }}</td>
+                                <td>{{ p.product__name }}</td>
+                                <td class="text-end">{{ p.units|floatformat:0|intcomma }}</td>
+                                <td class="text-end">{{ p.revenue|floatformat:2|intcomma }}</td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted">No data</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- RIGHT COLUMN: CART -->
+    <div class="col-lg-6">
+        <div class="card shadow-sm">
+
+            <div class="card-header bg-white d-flex justify-content-between">
+                <strong>Cart</strong>
+                <span class="text-muted small" id="cart-count">0 items</span>
+            </div>
+
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width:35%">Item</th>
+                                <th class="text-end" style="width:12%">Price</th>
+                                <th class="text-end" style="width:14%">Qty</th>
+                                <th class="text-end" style="width:14%">Disc</th>
+                                <th class="text-end" style="width:15%">Total</th>
+                                <th class="text-end" style="width:10%">Remove</th>
+                            </tr>
+                        </thead>
+
+                        <tbody id="cart-body">
+                            <tr><td colspan="6" class="text-center text-muted py-3">Empty cart</td></tr>
+                        </tbody>
+
+                    </table>
+                </div>
+            </div>
+
+            <div class="card-footer bg-white">
+
+                <div class="d-flex justify-content-between">
+                    <div class="text-muted small">Subtotal</div>
+                    <div class="fw-semibold" id="subtotal-text">KSHS 0.00</div>
+                </div>
+
+                <div class="d-flex justify-content-between">
+                    <div class="text-muted small">Discount</div>
+                    <div class="fw-semibold" id="discount-text">KSHS 0.00</div>
+                </div>
+
+                <div class="d-flex justify-content-between">
+                    <div class="text-muted small">Tax</div>
+                    <div class="fw-semibold" id="tax-text">KSHS 0.00</div>
+                </div>
+
+                <hr class="my-2">
+
+                <div class="d-flex justify-content-between">
+                    <div class="fs-5 fw-semibold">Total</div>
+                    <div class="fs-5 fw-bold text-primary" id="grand-total-text">
+                        KSHS 0.00
+                    </div>
+                </div>
+
+                <div id="sale-success-link" class="mt-2"></div>
+
+                <div class="d-flex gap-2 mt-3">
+                    <button id="btn-submit-sale" class="btn btn-primary flex-grow-1">
+                        <i class="bi bi-receipt me-1"></i> Sell
+                    </button>
+
+                    <button id="btn-clear-cart" class="btn btn-outline-secondary">
+                        <i class="bi bi-x-circle me-1"></i> Clear
+                    </button>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Reverse Sale -->
+        <div class="card shadow-sm my-3">
+            <div class="card-header bg-white">
+                <strong>Reverse Sale</strong>
+            </div>
+
+            <div class="card-body">
+                <form id="reverse-form" class="row g-2 align-items-end">
+                    <div class="col-md-6">
+                        <label class="form-label">Sale ID</label>
+                        <input id="reverse-id" class="form-control" placeholder="Enter sale ID to reverse…">
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label">Reason</label>
+                        <input id="reverse-reason" class="form-control" placeholder="Why are you reversing?">
+                    </div>
+
+                    <div class="col-12 d-flex gap-2">
+                        <button class="btn btn-outline-danger" type="submit">
+                            <i class="bi bi-arrow-counterclockwise me-1"></i> Reverse
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+    </div>
+</div>
+<!-- ================= PAST REVERSALS ================= -->
+<div class="card shadow-sm mt-3">
+  <div class="card-header bg-white d-flex justify-content-between align-items-center">
+      <strong>Past Reversals</strong>
+      <div class="small text-muted">Filtered by date, sale id or user</div>
+  </div>
+
+  <div class="card-body">
+
+      <!-- Filters -->
+      <form id="rev-filter" method="get" class="row g-2 align-items-end">
+
+          <div class="col-sm-4">
+              <label class="form-label">From</label>
+              <input type="date" id="rev-from" name="from" class="form-control"
+                     value="{{ from }}">
+          </div>
+
+          <div class="col-sm-4">
+              <label class="form-label">To</label>
+              <input type="date" id="rev-to" name="to" class="form-control"
+                     value="{{ to }}">
+          </div>
+
+          <div class="col-sm-4">
+              <label class="form-label">Search</label>
+              <input id="rev-q" name="q" class="form-control"
+                     placeholder="sale id / user / reason" value="{{ q }}">
+          </div>
+
+          <div class="col-12 d-flex gap-2">
+              <button class="btn btn-outline-primary" type="submit">
+                  <i class="bi bi-search me-1"></i> Apply
+              </button>
+
+              <button class="btn btn-outline-secondary" type="button" id="rev-clear">
+                  Clear
+              </button>
+          </div>
+
+      </form>
+
+      <!-- Reversal Table -->
+      <div class="table-responsive mt-3">
+          <table class="table table-sm align-middle mb-0">
+              <thead class="table-light">
+                  <tr>
+                      <th style="width:22%">Sale ID</th>
+                      <th class="text-end" style="width:15%">Total</th>
+                      <th style="width:15%">Reversed by</th>
+                      <th style="width:33%">Reason</th>
+                      <th style="width:15%">Reversed at</th>
+                  </tr>
+              </thead>
+
+              <tbody id="rev-body">
+
+                  {% if reversals %}
+                      {% for r in reversals %}
+
+                      <tr class="table-warning">
+
+                          <!-- SALE ID -->
+                          <td class="text-monospace small">
+                              <a href="/sales/{{ r.header.sale_id }}/"
+                                 class="text-decoration-none"
+                                 title="{{ r.header.sale_id }}">
+                                  {{ r.header.sale_id|slice:":8" }}…
+                              </a>
+                          </td>
+
+                          <!-- TOTAL -->
+                          <td class="text-end small fw-semibold text-danger">
+                              {{ r.header.total|floatformat:2|intcomma }}
+                          </td>
+
+                          <!-- USER -->
+                          <td class="small">
+                              <span class="badge bg-danger-subtle text-danger border">
+                                  {{ r.reversed_by.username }}
+                              </span>
+                          </td>
+
+                          <!-- REASON -->
+                          <td class="small text-truncate" style="max-width:260px">
+                              {% if r.reason %}
+                                  <span title="{{ r.reason }}">
+                                      {% if r.reason|length > 40 %}
+                                          {{ r.reason|slice:":40" }}…
+                                      {% else %}
+                                          {{ r.reason }}
+                                      {% endif %}
+                                  </span>
+                              {% else %}
+                                  <span class="text-muted">No reason</span>
+                              {% endif %}
+                          </td>
+
+                          <!-- TIMESTAMP -->
+                          <td class="small text-muted">
+                              <i class="bi bi-clock-history me-1"></i>
+                              {{ r.created_at|date:"Y-m-d H:i" }}
+                          </td>
+
+                      </tr>
+
+                      {% endfor %}
+                  {% else %}
+                      <tr><td colspan="5" class="text-center text-muted py-3">
+                          No reversals
+                      </td></tr>
+                  {% endif %}
+
+              </tbody>
+          </table>
+      </div>
+
+  </div>
+</div>
+
+<!-- ================= TOAST ================= -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index:1080">
+  <div id="toast" class="toast align-items-center text-bg-success border-0" role="alert">
+      <div class="d-flex">
+          <div id="toast-body" class="toast-body">Done</div>
+          <button type="button" class="btn-close btn-close-white me-2 m-auto"
+                  data-bs-dismiss="toast"></button>
+      </div>
+  </div>
+</div>
+
+<!-- ================= CONFIRM REVERSE MODAL ================= -->
+<div class="modal fade" id="confirmReverseModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+
+          <div class="modal-header">
+              <h5 class="modal-title">Confirm Reversal</h5>
+              <button class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+
+          <div class="modal-body">
+
+              <div>You are about to reverse sale:</div>
+              <div class="p-2 bg-light border rounded small mt-2"
+                   id="confirm-reverse-saleid"></div>
+
+              <div class="mt-3">
+                  <div class="text-muted small">Reason</div>
+                  <div id="confirm-reverse-reason" class="small"></div>
+              </div>
+
+              <div class="alert alert-warning d-flex gap-2 mt-3 py-2">
+                  <i class="bi bi-exclamation-triangle"></i>
+                  <div class="small">
+                      This action creates compensating entries and sets the sale to
+                      <strong>REVERSED</strong>. It cannot be edited or deleted.
+                  </div>
+              </div>
+
+          </div>
+
+          <div class="modal-footer">
+              <button id="btn-confirm-reverse" type="button" class="btn btn-danger">
+                  <i class="bi bi-arrow-counterclockwise me-1"></i> Reverse
+              </button>
+
+              <button class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                  Cancel
+              </button>
+          </div>
+
+      </div>
+  </div>
+</div>
+
+<!-- ================= REVERSE RECEIPT MODAL ================= -->
+<div class="modal fade" id="reverseReceiptModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+
+          <div class="modal-header">
+              <h5 class="modal-title">Reversal Receipt</h5>
+              <button class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+
+          <div class="modal-body">
+
+              <div class="d-flex justify-content-between">
+                  <div class="text-muted small">Sale ID</div>
+                  <div class="small" id="rec-sale-id"></div>
+              </div>
+
+              <div class="d-flex justify-content-between">
+                  <div class="text-muted small">Status</div>
+                  <div class="small" id="rec-status"></div>
+              </div>
+
+              <div class="d-flex justify-content-between">
+                  <div class="text-muted small">Total</div>
+                  <div class="small" id="rec-total"></div>
+              </div>
+
+              <div class="d-flex justify-content-between">
+                  <div class="text-muted small">Reversed by</div>
+                  <div class="small" id="rec-user"></div>
+              </div>
+
+              <div class="d-flex justify-content-between">
+                  <div class="text-muted small">Reversed at</div>
+                  <div class="small" id="rec-at"></div>
+              </div>
+
+          </div>
+
+          <div class="modal-footer">
+              <button class="btn btn-primary" data-bs-dismiss="modal">Done</button>
+          </div>
+
+      </div>
+  </div>
+</div>
+
+<!-- ================= M-PESA PAYMENT MODAL ================= -->
+<div class="modal fade" id="mpesaModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+
+            <div class="modal-header">
+                <h5 class="modal-title">M-Pesa Payment</h5>
+
+                <button
+                    type="button"
+                    class="btn-close"
+                    data-bs-dismiss="modal"
+                    aria-label="Close">
+                </button>
+            </div>
+
+            <div class="modal-body">
+
+                <div class="mb-3">
+                    <label class="form-label">Payment option</label>
+
+                    <div class="form-check border rounded p-3 mb-2">
+                        <input
+                            class="form-check-input ms-0 me-2"
+                            type="radio"
+                            name="mpesa-mode"
+                            id="mpesa-mode-stk"
+                            value="STK"
+                            checked>
+
+                        <label class="form-check-label" for="mpesa-mode-stk">
+                            <strong>Send STK Push</strong>
+                            <span class="d-block small text-muted">
+                                Send a payment request to the customer's phone.
+                            </span>
+                        </label>
+                    </div>
+
+                    <div class="form-check border rounded p-3">
+                        <input
+                            class="form-check-input ms-0 me-2"
+                            type="radio"
+                            name="mpesa-mode"
+                            id="mpesa-mode-manual"
+                            value="MANUAL">
+
+                        <label class="form-check-label" for="mpesa-mode-manual">
+                            <strong>Manual M-Pesa Payment</strong>
+                            <span class="d-block small text-muted">
+                                Customer has already paid using Paybill or Till.
+                            </span>
+                        </label>
+                    </div>
+                </div>
+
+                <div id="mpesa-phone-group">
+                    <label class="form-label">Customer phone</label>
+
+                    <input
+                        id="mpesa-phone"
+                        class="form-control"
+                        inputmode="numeric"
+                        placeholder="2547XXXXXXXX"
+                        maxlength="12">
+                </div>
+
+                <div id="mpesa-reference-group" class="d-none">
+                    <label class="form-label">M-Pesa transaction code</label>
+
+                    <input
+                        id="mpesa-reference"
+                        class="form-control text-uppercase"
+                        maxlength="20"
+                        placeholder="For example: TQ12ABCDEF">
+
+                    <div class="form-text">
+                        Confirm the code from the customer's M-Pesa message.
+                    </div>
+                </div>
+
+                <div id="mpesa-status" class="small mt-3"></div>
+
+            </div>
+
+            <div class="modal-footer">
+                <button
+                    type="button"
+                    class="btn btn-outline-secondary"
+                    data-bs-dismiss="modal">
+                    Cancel
+                </button>
+
+                <button
+                    type="button"
+                    id="mpesa-pay-btn"
+                    class="btn btn-primary">
+                    Send STK Push
+                </button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- ================= Insurance Modal PAYMENT MODAL ================= -->
+<div class="modal fade" id="insuranceModal">
+    <div class="modal-dialog">
+        <div class="modal-content">
+
+            <div class="modal-header">
+                <h5 class="modal-title">Insurance Details</h5>
+            </div>
+
+            <div class="modal-body">
+
+                <label>Insurance</label>
+                <select id="insurance-id" class="form-select">
+                    <option value="">
+                        Select Insurance
+                    </option>
+
+                    {% for ins in insurances %}
+                        <option value="{{ ins.id }}">
+                            {{ ins.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+
+                <label class="mt-2">Scheme</label>
+                <select id="scheme-id" class="form-select">
+                    <option value="">
+                        Select Insurance First
+                    </option>
+                </select>
+
+                <label class="mt-2">Member No</label>
+                <input id="member-no" class="form-control">
+
+                <label class="mt-2">Member Name</label>
+                <input id="member-name" class="form-control">
+
+                <label class="mt-2">Authorization No</label>
+                <input id="auth-no" class="form-control">
+
+            </div>
+
+            <div class="modal-footer">
+                <button id="insurance-submit-btn"
+                        class="btn btn-primary">
+                    Complete Sale
+                </button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- ================= PAYMENT METHOD MODAL ================= -->
+<div class="modal fade" id="paymentMethodModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Select Payment Method</h5>
+                <button class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+
+            <div class="modal-body">
+                <div class="row g-3">
+
+                    <div class="col-6">
+                        <button
+                            type="button"
+                            id="pay-cash"
+                            class="btn btn-outline-success w-100 py-4 h-100">
+                            <i class="bi bi-cash-stack fs-2 d-block mb-2"></i>
+                            <strong>Cash</strong>
+                        </button>
+                    </div>
+
+                    <div class="col-6">
+                        <button
+                            type="button"
+                            id="pay-mpesa"
+                            class="btn btn-outline-success w-100 py-4 h-100">
+                            <i class="bi bi-phone fs-2 d-block mb-2"></i>
+                            <strong>M-Pesa</strong>
+                        </button>
+                    </div>
+
+                    <div class="col-6">
+                        <button
+                            type="button"
+                            id="pay-card"
+                            class="btn btn-outline-primary w-100 py-4 h-100">
+                            <i class="bi bi-credit-card-2-front fs-2 d-block mb-2"></i>
+                            <strong>Card</strong>
+                        </button>
+                    </div>
+
+                    <div class="col-6">
+                        <button
+                            type="button"
+                            id="pay-insurance"
+                            class="btn btn-outline-warning w-100 py-4 h-100">
+                            <i class="bi bi-shield-check fs-2 d-block mb-2"></i>
+                            <strong>Insurance</strong>
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ================= BEGIN JAVASCRIPT ================= -->
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    "use strict";
+
+    /* ============================================================
+       ELEMENTS
+    ============================================================ */
+
+    const resultBody = document.getElementById("result-body");
+    const cartBody = document.getElementById("cart-body");
+    const cartCount = document.getElementById("cart-count");
+
+    const subtotalText = document.getElementById("subtotal-text");
+    const discountText = document.getElementById("discount-text");
+    const taxText = document.getElementById("tax-text");
+    const grandText = document.getElementById("grand-total-text");
+
+    const saleSuccessLink =
+        document.getElementById("sale-success-link");
+
+    const searchForm = document.getElementById("search-form");
+    const searchInput = document.getElementById("search-input");
+    const searchQty = document.getElementById("search-qty");
+    const clearSearchBtn =
+        document.getElementById("clear-search");
+
+    const submitBtn =
+        document.getElementById("btn-submit-sale");
+
+    const clearCartBtn =
+        document.getElementById("btn-clear-cart");
+
+    const paymentMethodModalElement =
+        document.getElementById("paymentMethodModal");
+
+    const mpesaModalElement =
+        document.getElementById("mpesaModal");
+
+    const insuranceModalElement =
+        document.getElementById("insuranceModal");
+
+    const confirmReverseModalElement =
+        document.getElementById("confirmReverseModal");
+
+    const reverseReceiptModalElement =
+        document.getElementById("reverseReceiptModal");
+
+    let cart = [];
+    let mpesaPollingTimer = null;
+
+
+    /* ============================================================
+       GENERAL UTILITIES
+    ============================================================ */
+
+    function csrftoken() {
+        const match =
+            document.cookie.match(/csrftoken=([^;]+)/);
+
+        return match ? match[1] : "";
+    }
+
+
+    function money(value) {
+        const amount =
+            Number(value || 0).toFixed(2);
+
+        return (
+            "KSHS " +
+            amount.replace(
+                /\B(?=(\d{3})+(?!\d))/g,
+                ","
+            )
+        );
+    }
+
+
+    function escapeHtml(value) {
+        return String(value ?? "").replace(
+            /[&<>"']/g,
+            character => ({
+                "&": "&amp;",
+                "<": "&lt;",
+                ">": "&gt;",
+                '"': "&quot;",
+                "'": "&#039;"
+            })[character]
+        );
+    }
+
+
+    function unescapeHtml(value) {
+        const element =
+            document.createElement("div");
+
+        element.innerHTML = value;
+
+        return element.textContent || "";
+    }
+
+
+    async function readJsonResponse(response) {
+        try {
+            return await response.json();
+        } catch (error) {
+            return {
+                error:
+                    `The server returned an invalid response ` +
+                    `(${response.status}).`
+            };
+        }
+    }
+
+
+    function showToast(message, variant = "success") {
+        const toastElement =
+            document.getElementById("toast");
+
+        const toastBody =
+            document.getElementById("toast-body");
+
+        if (!toastElement || !toastBody) {
+            console.log(message);
+            return;
+        }
+
+        toastBody.textContent = message;
+
+        toastElement.classList.remove(
+            "text-bg-success",
+            "text-bg-danger",
+            "text-bg-warning",
+            "text-bg-info"
+        );
+
+        toastElement.classList.add(
+            `text-bg-${variant}`
+        );
+
+        if (window.bootstrap) {
+            bootstrap.Toast
+                .getOrCreateInstance(
+                    toastElement,
+                    {
+                        delay: 4000
+                    }
+                )
+                .show();
+        }
+    }
+
+
+    function hideModal(modalElement) {
+        if (!modalElement || !window.bootstrap) {
+            return;
+        }
+
+        const modal =
+            bootstrap.Modal.getInstance(modalElement);
+
+        if (modal) {
+            modal.hide();
+        }
+    }
+
+
+    function showModal(modalElement) {
+        if (!modalElement || !window.bootstrap) {
+            return;
+        }
+
+        bootstrap.Modal
+            .getOrCreateInstance(modalElement)
+            .show();
+    }
+
+
+    function getSaleLines() {
+        return cart.map(item => ({
+            product_id: item.product_id,
+            qty: Number(item.qty),
+            unit_price: Number(item.unit_price),
+            discount: Number(item.discount || 0)
+        }));
+    }
+
+
+    function showSaleReceipt(data, message) {
+        const saleId =
+            String(data.sale_id || "");
+
+        if (!saleId) {
+            showToast(
+                "Sale completed, but no sale ID was returned.",
+                "warning"
+            );
+
+            return;
+        }
+
+        const receiptUrl =
+            `/sales/${encodeURIComponent(saleId)}/`;
+
+        cart = [];
+        renderCart();
+
+        showToast(
+            message || "Sale completed successfully",
+            "success"
+        );
+
+        saleSuccessLink.innerHTML = `
+            <div class="alert alert-success py-3 my-2">
+                <div class="d-flex flex-wrap
+                            justify-content-between
+                            align-items-center gap-3">
+
+                    <div>
+                        <div class="fw-bold">
+                            <i class="bi bi-check-circle-fill me-1"></i>
+                            Sale completed successfully
+                        </div>
+
+                        <div class="small mt-1">
+                            Receipt number:
+                            <strong>${escapeHtml(saleId)}</strong>
+                        </div>
+
+                        <div class="small">
+                            Total:
+                            <strong>${money(data.total)}</strong>
+                        </div>
+                    </div>
+
+                    <a
+                        href="${receiptUrl}"
+                        class="btn btn-success"
+                        target="_blank"
+                        rel="noopener">
+
+                        <i class="bi bi-receipt me-1"></i>
+                        View receipt
+                    </a>
+
+                </div>
+            </div>
+        `;
+
+        saleSuccessLink.scrollIntoView({
+            behavior: "smooth",
+            block: "nearest"
+        });
+    }
+
+
+    /* ============================================================
+       PRODUCT SEARCH
+    ============================================================ */
+
+    searchForm.addEventListener(
+        "submit",
+        async function (event) {
+            event.preventDefault();
+
+            const query =
+                String(searchInput.value || "").trim();
+
+            const quantity = Math.max(
+                1,
+                parseInt(searchQty.value || "1", 10)
+            );
+
+            if (!query) {
+                searchInput.focus();
+                return;
+            }
+
+            resultBody.innerHTML = `
+                <tr>
+                    <td colspan="3"
+                        class="text-center text-muted py-3">
+                        Searching...
+                    </td>
+                </tr>
+            `;
+
+            try {
+                const url =
+                    `/api/products/?search=` +
+                    `${encodeURIComponent(query)}` +
+                    `&page_size=10&ordering=name`;
+
+                const response = await fetch(
+                    url,
+                    {
+                        credentials: "same-origin",
+                        headers: {
+                            "X-Requested-With":
+                                "XMLHttpRequest"
+                        }
+                    }
+                );
+
+                const data =
+                    await readJsonResponse(response);
+
+                if (!response.ok) {
+                    throw new Error(
+                        data.error ||
+                        data.detail ||
+                        "Product search failed."
+                    );
+                }
+
+                const rows =
+                    Array.isArray(data)
+                        ? data
+                        : Array.isArray(data.results)
+                            ? data.results
+                            : [];
+
+                if (!rows.length) {
+                    resultBody.innerHTML = `
+                        <tr>
+                            <td colspan="3"
+                                class="text-center
+                                       text-muted py-3">
+                                No products found.
+                            </td>
+                        </tr>
+                    `;
+
+                    return;
+                }
+
+                renderResults(rows, quantity);
+
+            } catch (error) {
+                console.error(error);
+
+                resultBody.innerHTML = `
+                    <tr>
+                        <td colspan="3"
+                            class="text-center text-danger py-3">
+                            ${escapeHtml(
+                                error.message ||
+                                "Search failed."
+                            )}
+                        </td>
+                    </tr>
+                `;
+
+                showToast(
+                    error.message || "Search failed",
+                    "danger"
+                );
+            }
+        }
+    );
+
+
+    clearSearchBtn.addEventListener(
+        "click",
+        function () {
+            searchInput.value = "";
+            searchQty.value = "1";
+
+            resultBody.innerHTML = `
+                <tr>
+                    <td colspan="3"
+                        class="text-center text-muted py-3">
+                        Search to see results...
+                    </td>
+                </tr>
+            `;
+
+            searchInput.focus();
+        }
+    );
+
+
+    function renderResults(rows, defaultQuantity) {
+        resultBody.innerHTML = rows.map(product => {
+            const stock =
+                Number(product.stock ?? 0);
+
+            const lowStock =
+                stock <= 5 && stock > 0;
+
+            const outOfStock =
+                stock <= 0;
+
+            const productName =
+                escapeHtml(product.name || "");
+
+            const productSku =
+                escapeHtml(product.sku || "");
+
+            const stockClass =
+                outOfStock
+                    ? "bg-danger"
+                    : lowStock
+                        ? "bg-warning text-dark"
+                        : "bg-success";
+
+            const rowClass =
+                outOfStock
+                    ? "table-danger"
+                    : lowStock
+                        ? "table-warning"
+                        : "";
+
+            return `
+                <tr class="${rowClass}">
+                    <td>${productSku}</td>
+
+                    <td style="max-width:280px"
+                        class="text-truncate">
+
+                        ${productName}<br>
+
+                        <span class="badge ${stockClass}">
+                            ${stock} in stock
+                        </span>
+                    </td>
+
+                    <td class="text-end">
+                        <button
+                            type="button"
+                            class="btn btn-sm
+                                   btn-outline-primary"
+                            data-add="${Number(product.id)}"
+                            data-qty="${Number(defaultQuantity)}"
+                            data-price="${Number(
+                                product.average_buying_cost || 0
+                            )}"
+                            data-sku="${productSku}"
+                            data-name="${productName}"
+                            ${outOfStock ? "disabled" : ""}>
+
+                            <i class="bi bi-plus"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join("");
+
+
+        resultBody
+            .querySelectorAll("button[data-add]")
+            .forEach(button => {
+                button.addEventListener(
+                    "click",
+                    function () {
+                        const averageCost =
+                            Number(button.dataset.price);
+
+                        const minimumPrice =
+                            averageCost *
+                            1.33;
+
+                        const maximumPrice =
+                            averageCost *
+                            1.5;
+
+                        addToCart({
+                            product_id:
+                                Number(button.dataset.add),
+
+                            sku:
+                                button.dataset.sku,
+
+                            name:
+                                unescapeHtml(
+                                    button.dataset.name
+                                ),
+
+                            retail_price:
+                                averageCost,
+
+                            buying_cost:
+                                averageCost,
+
+                            unit_price:
+                                minimumPrice,
+
+                            min_price:
+                                minimumPrice,
+
+                            max_price:
+                                maximumPrice,
+
+                            qty:
+                                Number(button.dataset.qty),
+
+                            discount:
+                                0
+                        });
+                    }
+                );
+            });
+    }
+
+
+    /* ============================================================
+       CART
+    ============================================================ */
+
+    function addToCart(item) {
+        const existingItem =
+            cart.find(
+                cartItem =>
+                    cartItem.product_id ===
+                    item.product_id
+            );
+
+        if (existingItem) {
+            existingItem.qty =
+                Number(existingItem.qty) +
+                Number(item.qty);
+        } else {
+            cart.push(item);
+        }
+
+        saleSuccessLink.innerHTML = "";
+
+        renderCart();
+        validateStockInline();
+    }
+
+
+    function removeFromCart(productId) {
+        cart = cart.filter(
+            item =>
+                item.product_id !== productId
+        );
+
+        renderCart();
+        validateStockInline();
+    }
+
+
+    function updatePrice(productId, rawPrice) {
+        const item =
+            cart.find(
+                cartItem =>
+                    cartItem.product_id === productId
+            );
+
+        if (!item) {
+            return;
+        }
+
+        const price = Number(rawPrice);
+
+        if (!Number.isFinite(price)) {
+            showToast(
+                "Enter a valid price.",
+                "warning"
+            );
+
+            renderCart();
+            return;
+        }
+
+        if (price < Number(item.min_price)) {
+            showToast(
+                `Minimum price is ${money(item.min_price)}`,
+                "warning"
+            );
+
+            renderCart();
+            return;
+        }
+
+        if (price > Number(item.max_price)) {
+            showToast(
+                `Maximum price is ${money(item.max_price)}`,
+                "warning"
+            );
+
+            renderCart();
+            return;
+        }
+
+        item.unit_price = price;
+
+        renderCart();
+        validateStockInline();
+    }
+
+
+    function updateQuantity(productId, rawQuantity) {
+        const item =
+            cart.find(
+                cartItem =>
+                    cartItem.product_id === productId
+            );
+
+        if (!item) {
+            return;
+        }
+
+        const quantity =
+            Math.max(
+                1,
+                parseInt(rawQuantity || "1", 10)
+            );
+
+        item.qty = quantity;
+
+        renderCart();
+        validateStockInline();
+    }
+
+
+    function updateDiscount(
+        productId,
+        rawDiscount
+    ) {
+        const item =
+            cart.find(
+                cartItem =>
+                    cartItem.product_id === productId
+            );
+
+        if (!item) {
+            return;
+        }
+
+        const discount =
+            Number(rawDiscount);
+
+        const lineSubtotal =
+            Number(item.unit_price) *
+            Number(item.qty);
+
+        if (
+            !Number.isFinite(discount) ||
+            discount < 0
+        ) {
+            showToast(
+                "Enter a valid discount.",
+                "warning"
+            );
+
+            renderCart();
+            return;
+        }
+
+        if (discount > lineSubtotal) {
+            showToast(
+                "Discount cannot exceed the line subtotal.",
+                "warning"
+            );
+
+            renderCart();
+            return;
+        }
+
+        item.discount = discount;
+
+        renderCart();
+        validateStockInline();
+    }
+
+
+    function renderCart() {
+        if (!cart.length) {
+            cartBody.innerHTML = `
+                <tr>
+                    <td colspan="6"
+                        class="text-center text-muted py-3">
+                        Empty cart
+                    </td>
+                </tr>
+            `;
+
+            cartCount.textContent = "0 items";
+
+            renderCartTotalsOnly();
+            return;
+        }
+
+        cartBody.innerHTML = cart.map(item => {
+            /*
+             * Existing line-total calculation retained.
+             */
+            const lineTotal = Math.max(
+                0,
+                (
+                    Number(item.unit_price) *
+                    Number(item.qty)
+                ) -
+                Number(item.discount || 0)
+            );
+
+            return `
+                <tr id="cart-row-${item.product_id}">
+                    <td>
+                        <div class="fw-semibold">
+                            ${escapeHtml(item.sku)}
+                        </div>
+
+                        <div class="small text-muted
+                                    text-truncate">
+                            ${escapeHtml(item.name)}
+                        </div>
+
+                        <div
+                            class="small mt-1"
+                            id="stock-badge-${item.product_id}">
+                        </div>
+                    </td>
+
+                    <td class="text-end">
+                        <input
+                            type="number"
+                            class="form-control
+                                   form-control-sm
+                                   text-end"
+                            value="${Number(
+                                item.unit_price
+                            ).toFixed(2)}"
+                            min="${Number(
+                                item.min_price || 0
+                            )}"
+                            max="${Number(
+                                item.max_price || 999999
+                            )}"
+                            step="0.01"
+                            data-price-for="${item.product_id}">
+
+                        <div class="mt-1 d-flex gap-1
+                                    justify-content-end">
+
+                            <span class="badge bg-danger">
+                                Min
+                                ${Number(
+                                    item.min_price
+                                ).toFixed(2)}
+                            </span>
+
+                            <span class="badge bg-success">
+                                Max
+                                ${Number(
+                                    item.max_price
+                                ).toFixed(2)}
+                            </span>
+                        </div>
+                    </td>
+
+                    <td class="text-end">
+                        <input
+                            type="number"
+                            class="form-control
+                                   form-control-sm
+                                   text-end"
+                            value="${Number(item.qty)}"
+                            min="1"
+                            step="1"
+                            data-qty-for="${item.product_id}">
+                    </td>
+
+                    <td class="text-end">
+                        <input
+                            type="number"
+                            class="form-control
+                                   form-control-sm
+                                   text-end"
+                            value="${Number(
+                                item.discount || 0
+                            ).toFixed(2)}"
+                            min="0"
+                            step="0.01"
+                            data-disc-for="${item.product_id}">
+                    </td>
+
+                    <td class="text-end">
+                        ${money(lineTotal)}
+                    </td>
+
+                    <td class="text-end">
+                        <button
+                            type="button"
+                            class="btn btn-sm
+                                   btn-outline-danger"
+                            data-remove="${item.product_id}">
+
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join("");
+
+
+        const totalUnits =
+            cart.reduce(
+                (total, item) =>
+                    total + Number(item.qty),
+                0
+            );
+
+        cartCount.textContent =
+            `${totalUnits} item` +
+            `${totalUnits === 1 ? "" : "s"}`;
+
+
+        cartBody
+            .querySelectorAll(
+                "input[data-price-for]"
+            )
+            .forEach(input => {
+                input.addEventListener(
+                    "change",
+                    function () {
+                        updatePrice(
+                            Number(
+                                input.dataset.priceFor
+                            ),
+                            input.value
+                        );
+                    }
+                );
+            });
+
+
+        cartBody
+            .querySelectorAll(
+                "input[data-qty-for]"
+            )
+            .forEach(input => {
+                input.addEventListener(
+                    "change",
+                    function () {
+                        updateQuantity(
+                            Number(
+                                input.dataset.qtyFor
+                            ),
+                            input.value
+                        );
+                    }
+                );
+            });
+
+
+        cartBody
+            .querySelectorAll(
+                "input[data-disc-for]"
+            )
+            .forEach(input => {
+                input.addEventListener(
+                    "change",
+                    function () {
+                        updateDiscount(
+                            Number(
+                                input.dataset.discFor
+                            ),
+                            input.value
+                        );
+                    }
+                );
+            });
+
+
+        cartBody
+            .querySelectorAll(
+                "button[data-remove]"
+            )
+            .forEach(button => {
+                button.addEventListener(
+                    "click",
+                    function () {
+                        removeFromCart(
+                            Number(
+                                button.dataset.remove
+                            )
+                        );
+                    }
+                );
+            });
+
+
+        renderCartTotalsOnly();
+    }
+
+
+    function renderCartTotalsOnly() {
+        /*
+         * Existing calculations retained.
+         */
+        const subtotal =
+            cart.reduce(
+                (sum, item) =>
+                    sum +
+                    (
+                        Number(item.unit_price) *
+                        Number(item.qty)
+                    ),
+                0
+            );
+
+        const discount =
+            cart.reduce(
+                (sum, item) =>
+                    sum +
+                    Number(item.discount || 0),
+                0
+            );
+
+        const tax = 0;
+
+        const grand = Math.max(
+            0,
+            subtotal - discount + tax
+        );
+
+        subtotalText.textContent =
+            money(subtotal);
+
+        discountText.textContent =
+            money(discount);
+
+        taxText.textContent =
+            money(tax);
+
+        grandText.textContent =
+            money(grand);
+    }
+
+
+    clearCartBtn.addEventListener(
+        "click",
+        function () {
+            cart = [];
+            saleSuccessLink.innerHTML = "";
+            renderCart();
+
+            submitBtn.disabled = false;
+            submitBtn.classList.remove("disabled");
+
+            submitBtn.innerHTML = `
+                <i class="bi bi-receipt me-1"></i>
+                Sell
+            `;
+        }
+    );
+
+
+    /* ============================================================
+       STOCK VALIDATION
+    ============================================================ */
+
+    async function validateStockInline() {
+        if (!cart.length) {
+            submitBtn.disabled = false;
+            submitBtn.classList.remove("disabled");
+
+            submitBtn.innerHTML = `
+                <i class="bi bi-receipt me-1"></i>
+                Sell
+            `;
+
+            return false;
+        }
+
+        try {
+            const response = await fetch(
+                "/stock/check/",
+                {
+                    method: "POST",
+                    credentials: "same-origin",
+                    headers: {
+                        "Content-Type":
+                            "application/json",
+
+                        "X-CSRFToken":
+                            csrftoken(),
+
+                        "X-Requested-With":
+                            "XMLHttpRequest"
+                    },
+                    body: JSON.stringify({
+                        lines: getSaleLines()
+                    })
+                }
+            );
+
+            const data =
+                await readJsonResponse(response);
+
+            if (!response.ok) {
+                throw new Error(
+                    data.error ||
+                    data.detail ||
+                    "Stock validation failed."
+                );
+            }
+
+            const items =
+                Array.isArray(data.items)
+                    ? data.items
+                    : [];
+
+            let anyBad = false;
+
+            document
+                .querySelectorAll(".stock-warning")
+                .forEach(element => {
+                    element.remove();
+                });
+
+            items.forEach(item => {
+                const productId =
+                    Number(item.product_id);
+
+                const available =
+                    Number(item.available ?? 0);
+
+                const row =
+                    document.getElementById(
+                        `cart-row-${productId}`
+                    );
+
+                const badge =
+                    document.getElementById(
+                        `stock-badge-${productId}`
+                    );
+
+                if (!row) {
+                    return;
+                }
+
+                if (badge) {
+                    const badgeClass =
+                        available <= 0
+                            ? "bg-danger"
+                            : available <= 5
+                                ? "bg-warning text-dark"
+                                : "bg-success";
+
+                    badge.innerHTML = `
+                        <span class="badge ${badgeClass}">
+                            ${available} in stock
+                        </span>
+                    `;
+                }
+
+                row.classList.remove(
+                    "table-warning",
+                    "table-danger"
+                );
+
+                if (available <= 0) {
+                    row.classList.add(
+                        "table-danger"
+                    );
+                } else if (available <= 5) {
+                    row.classList.add(
+                        "table-warning"
+                    );
+                }
+
+                if (!item.ok) {
+                    anyBad = true;
+
+                    const warningRow =
+                        document.createElement("tr");
+
+                    warningRow.className =
+                        "stock-warning";
+
+                    warningRow.innerHTML = `
+                        <td colspan="6"
+                            class="text-danger small">
+
+                            Only ${available} units are
+                            available for
+
+                            <strong>
+                                ${escapeHtml(item.name || "")}
+                            </strong>.
+                        </td>
+                    `;
+
+                    row.insertAdjacentElement(
+                        "afterend",
+                        warningRow
+                    );
+                }
+            });
+
+            submitBtn.disabled = anyBad;
+
+            submitBtn.classList.toggle(
+                "disabled",
+                anyBad
+            );
+
+            submitBtn.innerHTML = anyBad
+                ? "Fix stock issues"
+                : `
+                    <i class="bi bi-receipt me-1"></i>
+                    Sell
+                `;
+
+            return anyBad;
+
+        } catch (error) {
+            console.error(error);
+
+            submitBtn.disabled = true;
+            submitBtn.classList.add("disabled");
+            submitBtn.textContent =
+                "Stock check failed";
+
+            showToast(
+                error.message ||
+                "Could not validate stock.",
+                "danger"
+            );
+
+            return true;
+        }
+    }
+
+
+    /* ============================================================
+       SHARED SALE SUBMISSION
+    ============================================================ */
+
+    async function submitSale(
+        paymentDetails,
+        successMessage
+    ) {
+        if (!cart.length) {
+            showToast(
+                "Cart is empty.",
+                "warning"
+            );
+
+            return null;
+        }
+
+        const stockIsBad =
+            await validateStockInline();
+
+        if (stockIsBad) {
+            showToast(
+                "Fix stock issues first.",
+                "danger"
+            );
+
+            return null;
+        }
+
+        const payload = {
+            pos_terminal: "WEB",
+            ...paymentDetails,
+            lines: getSaleLines()
+        };
+
+        try {
+            submitBtn.disabled = true;
+
+            submitBtn.innerHTML = `
+                <span
+                    class="spinner-border
+                           spinner-border-sm me-1"
+                    aria-hidden="true">
+                </span>
+                Processing...
+            `;
+
+            const response = await fetch(
+                "{% url 'accounts:sales-submit' %}",
+                {
+                    method: "POST",
+                    credentials: "same-origin",
+                    headers: {
+                        "Content-Type":
+                            "application/json",
+
+                        "X-CSRFToken":
+                            csrftoken(),
+
+                        "X-Requested-With":
+                            "XMLHttpRequest"
+                    },
+                    body: JSON.stringify(payload)
+                }
+            );
+
+            const data =
+                await readJsonResponse(response);
+
+            if (!response.ok) {
+                throw new Error(
+                    data.error ||
+                    data.detail ||
+                    "Sale submission failed."
+                );
+            }
+
+            showSaleReceipt(
+                data,
+                successMessage
+            );
+
+            return data;
+
+        } catch (error) {
+            console.error(error);
+
+            showToast(
+                error.message ||
+                "Sale submission failed.",
+                "danger"
+            );
+
+            return null;
+
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.classList.remove("disabled");
+
+            submitBtn.innerHTML = `
+                <i class="bi bi-receipt me-1"></i>
+                Sell
+            `;
+        }
+    }
+
+
+    /*
+     * Used after an external payment, such as successful
+     * STK confirmation.
+     */
+    async function finalizePaidSale(payload) {
+        try {
+            submitBtn.disabled = true;
+
+            const response = await fetch(
+                "{% url 'accounts:sales-submit' %}",
+                {
+                    method: "POST",
+                    credentials: "same-origin",
+                    headers: {
+                        "Content-Type":
+                            "application/json",
+
+                        "X-CSRFToken":
+                            csrftoken(),
+
+                        "X-Requested-With":
+                            "XMLHttpRequest"
+                    },
+                    body: JSON.stringify(payload)
+                }
+            );
+
+            const data =
+                await readJsonResponse(response);
+
+            if (!response.ok) {
+                throw new Error(
+                    data.error ||
+                    data.detail ||
+                    "Payment succeeded, but saving the sale failed."
+                );
+            }
+
+            showSaleReceipt(
+                data,
+                "M-Pesa payment completed"
+            );
+
+            return data;
+
+        } catch (error) {
+            console.error(error);
+
+            showToast(
+                error.message ||
+                "Payment received, but the sale was not saved.",
+                "danger"
+            );
+
+            return null;
+
+        } finally {
+            submitBtn.disabled = false;
+
+            submitBtn.innerHTML = `
+                <i class="bi bi-receipt me-1"></i>
+                Sell
+            `;
+        }
+    }
+
+
+    /* ============================================================
+       OPEN PAYMENT METHOD MODAL
+    ============================================================ */
+
+    submitBtn.addEventListener(
+        "click",
+        async function () {
+            if (!cart.length) {
+                showToast(
+                    "Cart is empty.",
+                    "warning"
+                );
+
+                return;
+            }
+
+            const stockIsBad =
+                await validateStockInline();
+
+            if (stockIsBad) {
+                showToast(
+                    "Fix stock issues first.",
+                    "danger"
+                );
+
+                return;
+            }
+
+            showModal(paymentMethodModalElement);
+        }
+    );
+
+
+    /* ============================================================
+       CASH
+    ============================================================ */
+
+    document
+        .getElementById("pay-cash")
+        .addEventListener(
+            "click",
+            async function () {
+                hideModal(
+                    paymentMethodModalElement
+                );
+
+                await submitSale(
+                    {
+                        payment_method: "CASH"
+                    },
+                    "Cash sale completed"
+                );
+            }
+        );
+
+
+    /* ============================================================
+       CARD
+    ============================================================ */
+
+    document
+        .getElementById("pay-card")
+        .addEventListener(
+            "click",
+            async function () {
+                hideModal(
+                    paymentMethodModalElement
+                );
+
+                await submitSale(
+                    {
+                        payment_method: "CARD"
+                    },
+                    "Card sale completed"
+                );
+            }
+        );
+
+
+    /* ============================================================
+       INSURANCE
+    ============================================================ */
+
+    const insuranceSelect =
+        document.getElementById("insurance-id");
+
+    const schemeSelect =
+        document.getElementById("scheme-id");
+
+    const insuranceSubmitBtn =
+        document.getElementById(
+            "insurance-submit-btn"
+        );
+
+
+    insuranceSelect.addEventListener(
+        "change",
+        async function () {
+            const insuranceId =
+                insuranceSelect.value;
+
+            schemeSelect.innerHTML = `
+                <option value="">
+                    Loading...
+                </option>
+            `;
+
+            if (!insuranceId) {
+                schemeSelect.innerHTML = `
+                    <option value="">
+                        Select Insurance First
+                    </option>
+                `;
+
+                return;
+            }
+
+            try {
+                const response = await fetch(
+                    `/insurance/schemes/` +
+                    `?insurance_id=` +
+                    `${encodeURIComponent(insuranceId)}`,
+                    {
+                        credentials: "same-origin",
+                        headers: {
+                            "X-Requested-With":
+                                "XMLHttpRequest"
+                        }
+                    }
+                );
+
+                const schemes =
+                    await readJsonResponse(response);
+
+                if (!response.ok) {
+                    throw new Error(
+                        schemes.error ||
+                        "Failed to load schemes."
+                    );
+                }
+
+                schemeSelect.innerHTML = `
+                    <option value="">
+                        Select Scheme
+                    </option>
+                `;
+
+                schemes.forEach(scheme => {
+                    const option =
+                        document.createElement(
+                            "option"
+                        );
+
+                    option.value = scheme.id;
+                    option.textContent =
+                        scheme.name;
+
+                    option.dataset.discount =
+                        scheme.discount_percent ?? 0;
+
+                    schemeSelect.appendChild(
+                        option
+                    );
+                });
+
+            } catch (error) {
+                console.error(error);
+
+                schemeSelect.innerHTML = `
+                    <option value="">
+                        Failed to load schemes
+                    </option>
+                `;
+
+                showToast(
+                    error.message ||
+                    "Failed to load schemes.",
+                    "danger"
+                );
+            }
+        }
+    );
+
+
+    schemeSelect.addEventListener(
+        "change",
+        function () {
+            const selectedOption =
+                schemeSelect.options[
+                    schemeSelect.selectedIndex
+                ];
+
+            if (
+                !selectedOption ||
+                !selectedOption.value
+            ) {
+                return;
+            }
+
+            const percentage =
+                Number(
+                    selectedOption.dataset.discount
+                );
+
+            if (!Number.isFinite(percentage)) {
+                showToast(
+                    "The scheme has an invalid percentage.",
+                    "danger"
+                );
+
+                return;
+            }
+
+            /*
+             * Existing insurance calculation retained.
+             */
+            cart.forEach(item => {
+                item.unit_price =
+                    Number(item.retail_price) *
+                    percentage /
+                    100;
+            });
+
+            renderCart();
+        }
+    );
+
+
+    document
+        .getElementById("pay-insurance")
+        .addEventListener(
+            "click",
+            function () {
+                hideModal(
+                    paymentMethodModalElement
+                );
+
+                showModal(
+                    insuranceModalElement
+                );
+            }
+        );
+
+
+    insuranceSubmitBtn.addEventListener(
+        "click",
+        async function () {
+            const insuranceId =
+                insuranceSelect.value;
+
+            const schemeId =
+                schemeSelect.value;
+
+            const memberNo =
+                document
+                    .getElementById("member-no")
+                    .value
+                    .trim();
+
+            const memberName =
+                document
+                    .getElementById("member-name")
+                    .value
+                    .trim();
+
+            const authNo =
+                document
+                    .getElementById("auth-no")
+                    .value
+                    .trim();
+
+            if (!insuranceId || !schemeId) {
+                showToast(
+                    "Insurance and scheme are required.",
+                    "warning"
+                );
+
+                return;
+            }
+
+            insuranceSubmitBtn.disabled = true;
+            insuranceSubmitBtn.textContent =
+                "Processing...";
+
+            try {
+                const result = await submitSale(
+                    {
+                        payment_method:
+                            "INSURANCE",
+
+                        insurance_id:
+                            insuranceId,
+
+                        insurance_scheme_id:
+                            schemeId,
+
+                        member_no:
+                            memberNo,
+
+                        member_name:
+                            memberName,
+
+                        auth_no:
+                            authNo
+                    },
+                    "Insurance sale completed"
+                );
+
+                if (result) {
+                    hideModal(
+                        insuranceModalElement
+                    );
+                }
+
+            } finally {
+                insuranceSubmitBtn.disabled = false;
+
+                insuranceSubmitBtn.textContent =
+                    "Complete Sale";
+            }
+        }
+    );
+
+
+    /* ============================================================
+       M-PESA: MANUAL OR STK
+    ============================================================ */
+
+    const mpesaPhoneGroup =
+        document.getElementById(
+            "mpesa-phone-group"
+        );
+
+    const mpesaReferenceGroup =
+        document.getElementById(
+            "mpesa-reference-group"
+        );
+
+    const mpesaPhoneInput =
+        document.getElementById(
+            "mpesa-phone"
+        );
+
+    const mpesaReferenceInput =
+        document.getElementById(
+            "mpesa-reference"
+        );
+
+    const mpesaStatus =
+        document.getElementById(
+            "mpesa-status"
+        );
+
+    const mpesaPayBtn =
+        document.getElementById(
+            "mpesa-pay-btn"
+        );
+
+
+    function getMpesaMode() {
+        const selected =
+            document.querySelector(
+                'input[name="mpesa-mode"]:checked'
+            );
+
+        return selected
+            ? selected.value
+            : "STK";
+    }
+
+
+    function setMpesaStatus(
+        message,
+        style = "text-muted"
+    ) {
+        mpesaStatus.textContent = message;
+
+        mpesaStatus.className =
+            `small mt-3 ${style}`;
+    }
+
+
+    function refreshMpesaUI() {
+        const mode =
+            getMpesaMode();
+
+        setMpesaStatus("");
+
+        if (mode === "MANUAL") {
+            mpesaPhoneGroup.classList.add(
+                "d-none"
+            );
+
+            mpesaReferenceGroup.classList.remove(
+                "d-none"
+            );
+
+            mpesaPhoneInput.required = false;
+            mpesaReferenceInput.required = true;
+
+            mpesaPayBtn.className =
+                "btn btn-success";
+
+            mpesaPayBtn.textContent =
+                "Complete Manual Payment";
+        } else {
+            mpesaPhoneGroup.classList.remove(
+                "d-none"
+            );
+
+            mpesaReferenceGroup.classList.add(
+                "d-none"
+            );
+
+            mpesaPhoneInput.required = true;
+            mpesaReferenceInput.required = false;
+
+            mpesaPayBtn.className =
+                "btn btn-primary";
+
+            mpesaPayBtn.textContent =
+                "Send STK Push";
+        }
+    }
+
+
+    function normalizeKenyanPhone(value) {
+        const phone =
+            String(value || "")
+                .replace(/\D/g, "");
+
+        if (/^07\d{8}$/.test(phone)) {
+            return `254${phone.substring(1)}`;
+        }
+
+        if (/^7\d{8}$/.test(phone)) {
+            return `254${phone}`;
+        }
+
+        if (/^2547\d{8}$/.test(phone)) {
+            return phone;
+        }
+
+        return null;
+    }
+
+
+    document
+        .querySelectorAll(
+            'input[name="mpesa-mode"]'
+        )
+        .forEach(radio => {
+            radio.addEventListener(
+                "change",
+                refreshMpesaUI
+            );
+        });
+
+
+    document
+        .getElementById("pay-mpesa")
+        .addEventListener(
+            "click",
+            function () {
+                hideModal(
+                    paymentMethodModalElement
+                );
+
+                const stkRadio =
+                    document.getElementById(
+                        "mpesa-mode-stk"
+                    );
+
+                stkRadio.checked = true;
+
+                mpesaPhoneInput.value = "";
+                mpesaReferenceInput.value = "";
+
+                refreshMpesaUI();
+                showModal(mpesaModalElement);
+            }
+        );
+
+
+    mpesaPayBtn.addEventListener(
+        "click",
+        async function () {
+            if (getMpesaMode() === "MANUAL") {
+                await processManualMpesa();
+                return;
+            }
+
+            await processStkMpesa();
+        }
+    );
+
+
+    async function processManualMpesa() {
+        const reference =
+            mpesaReferenceInput
+                .value
+                .trim()
+                .toUpperCase();
+
+        if (!reference) {
+            setMpesaStatus(
+                "Enter the M-Pesa transaction code.",
+                "text-danger"
+            );
+
+            mpesaReferenceInput.focus();
+            return;
+        }
+
+        if (!/^[A-Z0-9]{8,20}$/.test(reference)) {
+            setMpesaStatus(
+                "Enter a valid M-Pesa transaction code.",
+                "text-danger"
+            );
+
+            mpesaReferenceInput.focus();
+            return;
+        }
+
+        mpesaPayBtn.disabled = true;
+        mpesaPayBtn.textContent =
+            "Saving payment...";
+
+        setMpesaStatus(
+            "Saving manual M-Pesa payment...",
+            "text-primary"
+        );
+
+        try {
+            const result =
+                await submitSale(
+                    {
+                        payment_method:
+                            "MPESA",
+
+                        mpesa_mode:
+                            "MANUAL",
+
+                        payment_reference:
+                            reference
+                    },
+                    "Manual M-Pesa sale completed"
+                );
+
+            if (result) {
+                hideModal(
+                    mpesaModalElement
+                );
+
+                mpesaReferenceInput.value = "";
+                setMpesaStatus("");
+            }
+
+        } finally {
+            mpesaPayBtn.disabled = false;
+            refreshMpesaUI();
+        }
+    }
+
+
+    async function processStkMpesa() {
+        const phone =
+            normalizeKenyanPhone(
+                mpesaPhoneInput.value
+            );
+
+        if (!phone) {
+            setMpesaStatus(
+                "Enter a valid number, for example 0712345678.",
+                "text-danger"
+            );
+
+            mpesaPhoneInput.focus();
+            return;
+        }
+
+        const stockIsBad =
+            await validateStockInline();
+
+        if (stockIsBad) {
+            showToast(
+                "Fix stock issues first.",
+                "danger"
+            );
+
+            return;
+        }
+
+        mpesaPayBtn.disabled = true;
+        mpesaPayBtn.textContent =
+            "Sending...";
+
+        setMpesaStatus(
+            "Sending STK Push...",
+            "text-primary"
+        );
+
+        const payload = {
+            phone,
+            pos_terminal: "WEB",
+            payment_method: "MPESA",
+            mpesa_mode: "STK",
+            lines: getSaleLines()
+        };
+
+        try {
+            const response = await fetch(
+                "/api/mpesa/stkpush/",
+                {
+                    method: "POST",
+                    credentials: "same-origin",
+                    headers: {
+                        "Content-Type":
+                            "application/json",
+
+                        "X-CSRFToken":
+                            csrftoken(),
+
+                        "X-Requested-With":
+                            "XMLHttpRequest"
+                    },
+                    body: JSON.stringify(payload)
+                }
+            );
+
+            const data =
+                await readJsonResponse(response);
+
+            if (!response.ok) {
+                throw new Error(
+                    data.error ||
+                    data.detail ||
+                    "STK Push failed."
+                );
+            }
+
+            const checkoutId =
+                data.checkout_id ||
+                data.checkout_request_id ||
+                data.CheckoutRequestID;
+
+            if (!checkoutId) {
+                throw new Error(
+                    "The server did not return a checkout ID."
+                );
+            }
+
+            setMpesaStatus(
+                "STK Push sent. Awaiting customer PIN...",
+                "text-success"
+            );
+
+            pollMpesaPayment(
+                checkoutId,
+                phone
+            );
+
+        } catch (error) {
+            console.error(error);
+
+            setMpesaStatus(
+                error.message ||
+                "Failed to initiate payment.",
+                "text-danger"
+            );
+
+            mpesaPayBtn.disabled = false;
+            refreshMpesaUI();
+        }
+    }
+
+
+    function stopMpesaPolling() {
+        if (mpesaPollingTimer) {
+            clearInterval(
+                mpesaPollingTimer
+            );
+
+            mpesaPollingTimer = null;
+        }
+    }
+
+
+    function pollMpesaPayment(
+        checkoutId,
+        phone
+    ) {
+        stopMpesaPolling();
+
+        let attempts = 0;
+
+        mpesaPollingTimer = setInterval(
+            async function () {
+                attempts += 1;
+
+                if (attempts > 40) {
+                    stopMpesaPolling();
+
+                    setMpesaStatus(
+                        "Payment confirmation timed out. Check the transaction before retrying.",
+                        "text-warning"
+                    );
+
+                    mpesaPayBtn.disabled = false;
+                    refreshMpesaUI();
+                    return;
+                }
+
+                try {
+                    const response = await fetch(
+                        `/api/mpesa/status/` +
+                        `${encodeURIComponent(checkoutId)}/`,
+                        {
+                            credentials:
+                                "same-origin",
+
+                            headers: {
+                                "X-Requested-With":
+                                    "XMLHttpRequest"
+                            }
+                        }
+                    );
+
+                    const data =
+                        await readJsonResponse(
+                            response
+                        );
+
+                    if (!response.ok) {
+                        throw new Error(
+                            data.error ||
+                            "Could not check payment status."
+                        );
+                    }
+
+                    if (data.status === "SUCCESS") {
+                        stopMpesaPolling();
+
+                        setMpesaStatus(
+                            "Payment successful. Saving sale...",
+                            "text-success"
+                        );
+
+                        const serverPayload =
+                            data.sale_payload || {};
+
+                        const finalPayload = {
+                            ...serverPayload,
+
+                            pos_terminal:
+                                serverPayload
+                                    .pos_terminal ||
+                                "WEB",
+
+                            payment_method:
+                                "MPESA",
+
+                            mpesa_mode:
+                                "STK",
+
+                            payment_reference:
+                                data.payment_reference ||
+                                data.mpesa_receipt_number ||
+                                serverPayload
+                                    .payment_reference ||
+                                "",
+
+                            phone:
+                                data.phone ||
+                                serverPayload.phone ||
+                                phone,
+
+                            lines:
+                                Array.isArray(
+                                    serverPayload.lines
+                                ) &&
+                                serverPayload.lines.length
+                                    ? serverPayload.lines
+                                    : getSaleLines()
+                        };
+
+                        const result =
+                            await finalizePaidSale(
+                                finalPayload
+                            );
+
+                        if (result) {
+                            hideModal(
+                                mpesaModalElement
+                            );
+                        }
+
+                        mpesaPayBtn.disabled = false;
+                        refreshMpesaUI();
+                        return;
+                    }
+
+                    if (
+                        data.status === "FAILED" ||
+                        data.status === "CANCELLED"
+                    ) {
+                        stopMpesaPolling();
+
+                        setMpesaStatus(
+                            data.message ||
+                            "Payment failed or was cancelled.",
+                            "text-danger"
+                        );
+
+                        mpesaPayBtn.disabled = false;
+                        refreshMpesaUI();
+                    }
+
+                } catch (error) {
+                    console.error(error);
+                }
+            },
+            3000
+        );
+    }
+
+
+    mpesaModalElement.addEventListener(
+        "hidden.bs.modal",
+        function () {
+            stopMpesaPolling();
+
+            mpesaPayBtn.disabled = false;
+
+            mpesaPhoneInput.value = "";
+            mpesaReferenceInput.value = "";
+
+            setMpesaStatus("");
+        }
+    );
+
+
+    /* ============================================================
+       REVERSE SALE
+    ============================================================ */
+
+    const reverseForm =
+        document.getElementById(
+            "reverse-form"
+        );
+
+    const reverseId =
+        document.getElementById(
+            "reverse-id"
+        );
+
+    const reverseReason =
+        document.getElementById(
+            "reverse-reason"
+        );
+
+    const confirmSaleIdBox =
+        document.getElementById(
+            "confirm-reverse-saleid"
+        );
+
+    const confirmReasonBox =
+        document.getElementById(
+            "confirm-reverse-reason"
+        );
+
+    const confirmReverseBtn =
+        document.getElementById(
+            "btn-confirm-reverse"
+        );
+
+    const recSaleId =
+        document.getElementById(
+            "rec-sale-id"
+        );
+
+    const recStatus =
+        document.getElementById(
+            "rec-status"
+        );
+
+    const recTotal =
+        document.getElementById(
+            "rec-total"
+        );
+
+    const recUser =
+        document.getElementById(
+            "rec-user"
+        );
+
+    const recAt =
+        document.getElementById(
+            "rec-at"
+        );
+
+    let pendingReversal = {
+        id: "",
+        reason: ""
+    };
+
+
+    reverseForm.addEventListener(
+        "submit",
+        function (event) {
+            event.preventDefault();
+
+            const saleId =
+                String(
+                    reverseId.value || ""
+                ).trim();
+
+            const reason =
+                String(
+                    reverseReason.value || ""
+                ).trim();
+
+            if (!saleId) {
+                showToast(
+                    "Enter a sale ID to reverse.",
+                    "warning"
+                );
+
+                reverseId.focus();
+                return;
+            }
+
+            pendingReversal = {
+                id: saleId,
+                reason
+            };
+
+            confirmSaleIdBox.textContent =
+                saleId;
+
+            confirmReasonBox.textContent =
+                reason || "(none)";
+
+            showModal(
+                confirmReverseModalElement
+            );
+        }
+    );
+
+
+    confirmReverseBtn.addEventListener(
+        "click",
+        async function () {
+            const saleId =
+                pendingReversal.id;
+
+            const reason =
+                pendingReversal.reason;
+
+            if (!saleId) {
+                showToast(
+                    "No sale selected.",
+                    "warning"
+                );
+
+                return;
+            }
+
+            confirmReverseBtn.disabled = true;
+            confirmReverseBtn.textContent =
+                "Reversing...";
+
+            try {
+                const response = await fetch(
+                    "{% url 'accounts:sales-reverse' %}",
+                    {
+                        method: "POST",
+                        credentials: "same-origin",
+                        headers: {
+                            "Content-Type":
+                                "application/json",
+
+                            "X-CSRFToken":
+                                csrftoken(),
+
+                            "X-Requested-With":
+                                "XMLHttpRequest"
+                        },
+                        body: JSON.stringify({
+                            sale_id: saleId,
+                            reason
+                        })
+                    }
+                );
+
+                const data =
+                    await readJsonResponse(response);
+
+                if (!response.ok) {
+                    throw new Error(
+                        data.error ||
+                        data.detail ||
+                        "Reverse failed."
+                    );
+                }
+
+                hideModal(
+                    confirmReverseModalElement
+                );
+
+                recSaleId.textContent =
+                    data.sale_id || saleId;
+
+                recStatus.textContent =
+                    data.status || "REVERSED";
+
+                recTotal.textContent =
+                    data.total !== undefined
+                        ? money(data.total)
+                        : "-";
+
+                recUser.textContent =
+                    data.reversed_by || "-";
+
+                recAt.textContent =
+                    data.reversed_at || "-";
+
+                showModal(
+                    reverseReceiptModalElement
+                );
+
+                showToast(
+                    "Sale reversed successfully.",
+                    "success"
+                );
+
+                reverseId.value = "";
+                reverseReason.value = "";
+
+                pendingReversal = {
+                    id: "",
+                    reason: ""
+                };
+
+            } catch (error) {
+                console.error(error);
+
+                showToast(
+                    error.message ||
+                    "Network error reversing sale.",
+                    "danger"
+                );
+
+            } finally {
+                confirmReverseBtn.disabled = false;
+
+                confirmReverseBtn.innerHTML = `
+                    <i class="bi
+                              bi-arrow-counterclockwise
+                              me-1"></i>
+                    Reverse
+                `;
+            }
+        }
+    );
+
+
+    /* ============================================================
+       REVERSAL FILTER CLEAR
+    ============================================================ */
+
+    const reversalClearBtn =
+        document.getElementById("rev-clear");
+
+    if (reversalClearBtn) {
+        reversalClearBtn.addEventListener(
+            "click",
+            function () {
+                const from =
+                    document.getElementById(
+                        "rev-from"
+                    );
+
+                const to =
+                    document.getElementById(
+                        "rev-to"
+                    );
+
+                const query =
+                    document.getElementById(
+                        "rev-q"
+                    );
+
+                if (from) {
+                    from.value = "";
+                }
+
+                if (to) {
+                    to.value = "";
+                }
+
+                if (query) {
+                    query.value = "";
+                }
+
+                window.location.href =
+                    window.location.pathname;
+            }
+        );
+    }
+
+
+    /* ============================================================
+       INITIAL DISPLAY
+    ============================================================ */
+
+    renderCart();
+});
+</script>
+
+{% endblock %}

@@ -1,0 +1,189 @@
+{% extends "accounts/base.html" %}
+
+{% block dashboard_content %}
+
+<div class="card shadow-sm">
+
+    <div class="card-header bg-white">
+    
+        <a href="{% url 'accounts:create-supplier-invoice' receipt.id %}" class="btn btn-primary mt-2">
+    
+            <i class="bi bi-receipt me-1"></i>
+    
+            Create Purchase Order Invoice
+    
+        </a>
+    
+    </div>
+
+
+    
+
+    <div class="card-header bg-white">
+
+        <h4>
+
+            <i class="bi bi-truck me-2 text-warning"></i>
+
+            Goods Receipt
+
+            GRN-{{ receipt.grn_no|stringformat:"s"|slice:":8" }}
+
+        </h4>
+
+    </div>
+
+    <div class="card-body">
+        <div class="card-header bg-white">
+
+        <div class="row mb-4">
+
+            <div class="col-md-3">
+
+                <strong>GRN No</strong><br>
+
+                {{ receipt.grn_no }}
+
+            </div>
+
+            <div class="col-md-3">
+
+                <strong>PO</strong><br>
+
+                PUR-{{ receipt.po.purchase_id|stringformat:"s"|slice:":8" }}
+
+            </div>
+
+            <div class="col-md-3">
+
+                <strong>Supplier</strong><br>
+
+                {{ receipt.supplier }}
+
+            </div>
+
+            <div class="col-md-3">
+
+                <strong>Status</strong><br>
+
+                <span class="badge bg-warning text-dark">
+
+                    {{ receipt.status }}
+
+                </span>
+
+            </div>
+  
+
+        </div>
+
+        <div class="row mb-4">
+
+            <div class="col-md-3">
+
+                <strong>Branch</strong><br>
+
+                {{ receipt.branch }}
+
+            </div>
+
+            <div class="col-md-3">
+
+                <strong>Received By</strong><br>
+
+                {{ receipt.received_by }}
+
+            </div>
+
+            <div class="col-md-3">
+
+                <strong>Date Received</strong><br>
+
+                {{ receipt.received_at }}
+
+            </div>
+
+        </div>
+    </div>
+
+        
+        <table id="goodsReceiptsTableDetail" class="table table-hover erp-table align-middle w-100">
+
+            <thead>
+
+                <tr>
+
+                    <th>Product</th>
+                    <th class="text-end">Ordered Qty</th>
+                    <th class="text-end">Received Qty</th>
+                    <th>Batch No</th>
+                    <th>Expiry Date</th>
+
+                </tr>
+
+            </thead>
+
+            <tbody>
+
+                {% for line in receipt.lines.all %}
+
+                <tr>
+
+                    <td>
+
+                        {{ line.product }}
+
+                    </td>
+
+                    <td
+                        class="text-end"
+                        data-order="{{ line.ordered_qty }}"
+                    >
+                        {{ line.ordered_qty }}
+                    </td>
+
+                    <td
+                        class="text-end"
+                        data-order="{{ line.received_qty }}"
+                    >
+                        {{ line.received_qty }}
+                    </td>
+
+                    <td>
+
+                        {{ line.batch_no }}
+
+                    </td>
+
+                    <td
+                        data-order="{{ line.expiry_date|date:'Ymd' }}"
+                    >
+                        {{ line.expiry_date }}
+                    </td>
+
+                </tr>
+
+                {% empty %}
+
+                <tr>
+
+                    <td colspan="5"
+                        class="text-center text-muted">
+
+                        No receipt lines found.
+
+                    </td>
+
+                </tr>
+
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+{% endblock %}

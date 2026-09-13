@@ -1,0 +1,108 @@
+{% extends "accounts/base.html" %}
+
+{% block dashboard_content %}
+
+<h3>
+
+    <i class="bi bi-file-earmark-arrow-up text-warning me-2"></i>
+
+    PAID INVOICES
+
+</h3>
+
+<div class="card shadow-sm mt-3">
+
+    <div class="card-body table-responsive">
+
+        <table id="invoicePostingTable" class="table table-bordered table-hover erp-table align-middle w-100">
+
+            <thead class="table-light">
+                <tr>
+                    <th>Invoice No</th>
+                    <th>Supplier</th>
+                    <th>Invoice Date</th>
+                    <th >Amount</th>
+                    <th>Status</th>
+                    <th class="text-end no-sort">Actions</th>
+                </tr>
+            </thead>
+            
+
+            <tbody>
+
+                {% for invoice in invoices %}
+
+                <tr>
+
+                    <td>{{ invoice.invoice_no }}</td>
+
+                    <td>{{ invoice.supplier }}</td>
+
+                    <td data-order="{{ invoice.invoice_date|date:'Ymd' }}">
+                        {{ invoice.invoice_date }}
+                    </td>
+
+                    <td data-order="{{ invoice.total_amount }}">
+                        {{ invoice.total_amount|floatformat:2 }}
+                    </td>
+
+                    <td data-order="{{ invoice.status }}">
+
+                        <span class="badge bg-secondary">
+                            {{ invoice.status }}
+                        </span>
+                    
+                    </td>
+
+                    <td class="text-end">
+
+                        <div class="btn-group">
+
+                            <a href="{% url 'accounts:supplier-invoice-detail' invoice.id %}" class="btn btn-sm btn-outline-primary">
+
+                                <i class="bi bi-eye me-1"></i>
+
+                                View
+
+                            </a>
+
+                            <!--<a href="{% url 'accounts:post-supplier-invoice' invoice.id %}">
+
+                                <i class="bi bi-check-circle me-1"></i>
+
+                                Post
+
+                            </a>-->
+
+                        </div>
+
+                    </td>
+
+                </tr>
+
+                {% empty %}
+
+                <tr>
+
+                    <td colspan="6"
+                        class="text-center text-muted py-4">
+
+                        <i class="bi bi-inbox fs-4 d-block mb-2"></i>
+
+                        No draft invoices awaiting posting.
+
+                    </td>
+
+                </tr>
+
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+{% endblock %}

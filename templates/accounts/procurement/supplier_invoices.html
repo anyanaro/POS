@@ -1,0 +1,103 @@
+{% extends "accounts/base.html" %}
+{% block dashboard_content %}
+
+<div class="card shadow-sm">
+
+    <div class="card-header bg-white">
+
+        <h4>
+
+            <i class="bi bi-receipt-cutoff text-danger me-2"></i>
+
+            Supplier Invoices
+
+        </h4>
+
+    </div>
+
+    <div class="card-body table-responsive">
+
+        <table id="supplierInvoicesTable" class="table table-striped erp-table align-middle w-100">
+
+                <thead class="table-light">
+                    <tr>
+                        <th>Invoice</th>
+                        <th>Supplier</th>
+                        <th>Date</th>
+                        <th class="text-end">Total</th>
+                        <th>Status</th>
+                        <th class="text-end no-sort">Actions</th>
+                    </tr>
+                </thead>
+
+            <tbody>
+
+                {% for invoice in invoices %}
+
+                <tr>
+
+                    <td>
+
+                        {{ invoice.invoice_no }}
+
+                    </td>
+
+                    <td>
+
+                        {{ invoice.supplier }}
+
+                    </td>
+
+                    <td data-order="{{ invoice.invoice_date|date:'Ymd' }}">
+                        {{ invoice.invoice_date }}
+                    </td>
+
+                    <td
+                        class="text-end"
+                        data-order="{{ invoice.total_amount }}"
+                    >
+                        {{ invoice.total_amount|floatformat:2 }}
+                    </td>
+
+                    <td data-order="{{ invoice.status }}">
+
+                        <span class="badge bg-info">
+                            {{ invoice.status }}
+                        </span>
+                    
+                    </td>
+
+                    <td class="text-end">
+
+                        <a href="{% url 'accounts:supplier-invoice-detail' invoice.id %}" class="btn btn-sm btn-outline-primary">
+
+                            <i class="bi bi-eye"></i>
+
+                            View
+
+                        </a>
+
+                        <a href="{% url 'accounts:supplier-invoice-pdf' invoice.id %}" class="btn btn-sm btn-outline-danger">
+
+                            <i class="bi bi-file-earmark-pdf"></i>
+
+                            PDF
+
+                        </a>
+
+                    </td>
+  
+
+                </tr>
+
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+{% endblock %}

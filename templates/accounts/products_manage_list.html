@@ -1,0 +1,233 @@
+{% extends "accounts/base.html" %}
+{% block dashboard_content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="mb-0">Products</h4>
+  {% url 'accounts:product-add' as add_url %}
+  <a href="{{ add_url }}" class="btn btn-primary">
+    <i class="bi bi-plus-circle me-1"></i> Add Product
+  </a>
+</div>
+
+<!-- Search & page size -->
+<form id="search-form" class="row g-2 align-items-end mb-3">
+  <div class="col-sm-6 col-md-4">
+    <label class="form-label">Search</label>
+    <input id="search-input" class="form-control" placeholder="SKU or Name">
+  </div>
+  <div class="col-sm-6 col-md-2">
+    <label class="form-label">Page size</label>
+    <select id="page-size" class="form-select">
+      <option value="10" selected>10</option>
+      <option value="25">25</option>
+      <option value="50">50</option>
+    </select>
+  </div>
+  <div class="col-sm-12 col-md-auto">
+    <button class="btn btn-outline-primary"><i class="bi bi-search me-1"></i> Search</button>
+  </div>
+</form>
+
+<div class="card shadow-sm">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-sm table-hover align-middle mb-0 erp-table" data-dynamic-table="true">
+        <thead class="table-light">
+          <tr>
+            <th>SKU</th>
+            <th>BC Number</th>
+            <th>Name</th>
+            <th class="text-end">Unit Price</th>
+            <th class="text-center">Active</th>
+            <th class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="products-tbody">
+          <tr><td colspan="6" class="text-center text-muted py-3">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Pagination controls -->
+<nav class="mt-3">
+  <ul id="pager" class="pagination pagination-sm mb-0"></ul>
+</nav>
+
+<!-- Toast container -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1080">
+  <div id="toast" class="toast align-items-center text-bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+    <div class="d-flex">
+      <div id="toast-body" class="toast-body">Done</div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const tbody = document.getElementById('products-tbody');
+  const pager = document.getElementById('pager');
+  const searchForm = document.getElementById('search-form');
+  const searchInput = document.getElementById('search-input');
+  const pageSizeSel = document.getElementById('page-size');
+
+  // read ?toast= param to show success messages after redirect
+  const params = new URLSearchParams(window.location.search);
+  const toastParam = params.get('toast');
+  if (toastParam) {
+    const msg = toastParam === 'created' ? 'Product created'
+              : toastParam === 'updated' ? 'Product updated'
+              : toastParam === 'deleted' ? 'Product deleted'
+              : 'Done';
+    showToast(msg, 'success');
+    // clean the param to avoid showing again
+    params.delete('toast');
+    const newUrl = `${location.pathname}${params.toString() ? '?'+params.toString(): ''}`;
+    window.history.replaceState({}, '', newUrl);
+  }
+
+  let state = {
+    page: Number(params.get('page') || 1),
+    pageSize: Number(params.get('page_size') || 10),
+    search: params.get('search') || ''
+  };
+  searchInput.value = state.search;
+  pageSizeSel.value = String(state.pageSize);
+
+  function fmtMoney(x){ return new Intl.NumberFormat(undefined,{style:'currency',currency:'USD'}).format(Number(x||0)); }
+
+  function buildUrl(){
+    const p = new URLSearchParams();
+    if (state.search) p.set('search', state.search);
+    p.set('page', state.page);
+    p.set('page_size', state.pageSize);
+    return '/api/products/?' + p.toString();
+  }
+
+  function setLoading(){
+    const table = tbody.closest('table');
+    if (window.jQuery && $.fn.DataTable.isDataTable(table)) $(table).DataTable().destroy();
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-3">Loading…</td></tr>`;
+    pager.innerHTML = '';
+  }
+
+  async function load(){
+    setLoading();
+    try{
+      const url = buildUrl();
+      const resp = await fetch(url, {headers: {'X-Requested-With':'XMLHttpRequest'}});
+      const data = await resp.json();
+
+      // DRF pagination returns {count,next,previous,results}
+      const rows = Array.isArray(data) ? data : (data.results || []);
+      renderTable(rows);
+      renderPager(data);
+      window.initErpTables?.();
+    }catch(e){
+      console.error(e);
+      tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-3">Failed to load products.</td></tr>`;
+      showToast('Failed to load products', 'danger');
+    }
+  }
+
+  function renderTable(rows){
+    if (!rows.length){
+      tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-3">No products</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = rows.map(r => `
+      <tr>
+        <td>${r.sku || ''}</td>
+        <td>${r.bc_number || ''}</td>
+        <td>${r.name || ''}</td>
+        <td class="text-end">${fmtMoney(r.unit_price)}</td>
+        <td class="text-center">${r.active ? '<span class="badge bg-success">Yes</span>' : '<span class="badge bg-secondary">No</span>'}</td>
+        <td class="text-end">
+          <a href="/products/manage/${r.id}/edit/" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
+          <a href="/products/manage/${r.id}/delete/" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></a>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function renderPager(data){
+    // handle non-paginated (array) case
+    if (Array.isArray(data)) { pager.innerHTML = ''; return; }
+
+    const count = data.count || 0;
+    const totalPages = Math.max(1, Math.ceil(count / state.pageSize));
+    const cur = Math.min(state.page, totalPages);
+
+    function pageItem(label, page, disabled=false, active=false){
+      const cls = ['page-item', disabled ? 'disabled':'', active ? 'active':''].join(' ');
+      return `<li class="${cls}"><a class="page-link" href="#" data-page="${page}">${label}</a></li>`;
+    }
+
+    let html = '';
+    html += pageItem('&laquo;', 1, cur === 1);
+    html += pageItem('&lsaquo;', Math.max(1, cur-1), cur === 1);
+
+    // show window of pages around current
+    const windowSize = 2;
+    const start = Math.max(1, cur - windowSize);
+    const end = Math.min(totalPages, cur + windowSize);
+    for (let p = start; p <= end; p++){
+      html += pageItem(String(p), p, false, p === cur);
+    }
+
+    html += pageItem('&rsaquo;', Math.min(totalPages, cur+1), cur === totalPages);
+    html += pageItem('&raquo;', totalPages, cur === totalPages);
+    pager.innerHTML = html;
+
+    // wire clicks
+    pager.querySelectorAll('a.page-link').forEach(a => {
+      a.addEventListener('click', (e) => {
+        e.preventDefault();
+        const p = Number(a.getAttribute('data-page'));
+        if (!Number.isNaN(p) && p !== state.page){
+          state.page = p;
+          // reflect in URL for shareable state
+          syncUrl();
+          load();
+        }
+      });
+    });
+  }
+
+  function syncUrl(){
+    const p = new URLSearchParams();
+    if (state.search) p.set('search', state.search);
+    p.set('page', state.page);
+    p.set('page_size', state.pageSize);
+    const newUrl = `${location.pathname}?${p.toString()}`;
+    window.history.replaceState({}, '', newUrl);
+  }
+
+  searchForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    state.search = (searchInput.value || '').trim();
+    state.pageSize = Number(pageSizeSel.value || 10);
+    state.page = 1; // reset to first page after filtering
+    syncUrl();
+    load();
+  });
+
+  // Toast helpers (Bootstrap 5)
+  function showToast(message, variant='success'){
+    const toastEl = document.getElementById('toast');
+    const body = document.getElementById('toast-body');
+    body.textContent = message;
+    toastEl.classList.remove('text-bg-success','text-bg-danger','text-bg-warning','text-bg-info');
+    toastEl.classList.add(`text-bg-${variant}`);
+    const t = new bootstrap.Toast(toastEl, { delay: 2500 });
+    t.show();
+  }
+  window.showToast = showToast; // expose for other scripts if needed
+
+  load();
+})();
+</script>
+
+{% endblock %}

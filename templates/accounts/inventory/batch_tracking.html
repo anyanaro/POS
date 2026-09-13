@@ -1,0 +1,76 @@
+{% extends "accounts/base.html" %}
+
+{% block dashboard_content %}
+
+<div class="card shadow-sm">
+
+    <div class="card-header bg-white">
+        <h4 class="mb-0">
+            <i class="bi bi-layers me-2 text-primary"></i>
+            Batch Tracking
+        </h4>
+    </div>
+
+    <div class="card-body">
+
+        <div class="row mb-3">
+            <div class="col-md-4">
+                <label for="branchFilter" class="form-label fw-semibold">
+                    Branch
+                </label>
+
+                <select id="branchFilter" class="form-select">
+                    <option value="">All Branches</option>
+
+                    {% for branch in branches %}
+                    <option value="{{ branch }}">
+                        {{ branch }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="erp-table"
+                id="batchTable"
+                class="table table-hover table-bordered align-middle erp-table w-100"
+            >
+                <thead class="table-light">
+                    <tr>
+                        <th>Product</th>
+                        <th>Batch</th>
+                        <th>Branch</th>
+                        <th>Expiry Date</th>
+                        <th class="text-end">Quantity</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for batch in batches %}
+                    <tr>
+                        <td>{{ batch.product }}</td>
+                        <td>{{ batch.batch_no }}</td>
+                        <td>{{ batch.branch }}</td>
+                        <td>{{ batch.expiry_date|date:"d M Y" }}</td>
+                        <td class="text-end">
+                            {{ batch.qty_on_hand|floatformat:0 }}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center text-muted">
+                            No batch records found.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+
+            </table>
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

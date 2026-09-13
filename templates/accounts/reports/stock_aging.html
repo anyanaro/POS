@@ -1,0 +1,72 @@
+{% extends "accounts/base.html" %}
+{% block dashboard_content %}
+
+<h3>
+<i class="bi bi-hourglass-split text-warning me-2"></i>
+Stock Aging Report
+</h3>
+
+<ul class="nav nav-tabs mt-3" role="tablist">
+<li class="nav-item"><a class="nav-link active text-success" data-bs-toggle="tab" href="#age30">0-30 days <span class="badge bg-success ms-1">{{ bands.0.rows|length }}</span></a></li>
+<li class="nav-item"><a class="nav-link text-warning" data-bs-toggle="tab" href="#age60">31-60 days <span class="badge bg-warning text-dark ms-1">{{ bands.1.rows|length }}</span></a></li>
+<li class="nav-item"><a class="nav-link text-warning" data-bs-toggle="tab" href="#age90">61-90 days <span class="badge bg-warning text-dark ms-1">{{ bands.2.rows|length }}</span></a></li>
+<li class="nav-item"><a class="nav-link text-danger" data-bs-toggle="tab" href="#ageOlder">Above 90 days <span class="badge bg-danger ms-1">{{ bands.3.rows|length }}</span></a></li>
+</ul>
+
+<div class="tab-content">
+{% for band in bands %}
+<div class="tab-pane fade {% if forloop.first %}show active{% endif %}" id="{{ band.target }}">
+<div class="card shadow-sm mt-3 {% if band.target == 'age30' %}border-success{% elif band.target == 'ageOlder' %}border-danger{% else %}border-warning{% endif %}">
+<div class="card-body table-responsive">
+<table class="table erp-table">
+
+<thead>
+
+<tr>
+<th>Product</th>
+<th>Branch</th>
+<th>Days In Stock</th>
+<th>Quantity</th>
+<th>Age Band</th>
+</tr>
+
+</thead>
+
+<tbody>
+
+{% for row in band.rows %}
+
+<tr>
+
+<td>{{ row.product }}</td>
+<td>{{ row.branch }}</td>
+<td>{{ row.days }}</td>
+
+<td>{{ row.qty|floatformat:2 }}</td>
+
+<td>
+
+<span class="badge {% if band.target == 'age30' %}bg-success{% elif band.target == 'ageOlder' %}bg-danger{% else %}bg-warning text-dark{% endif %}">
+
+{{ band.label }}
+
+</span>
+
+</td>
+
+</tr>
+{% empty %}
+<tr><td colspan="5" class="text-center text-muted">No stock in this age band.</td></tr>
+{% endfor %}
+
+</tbody>
+
+</table>
+
+</div>
+</div>
+</div>
+{% endfor %}
+</div>
+
+{% endblock %}

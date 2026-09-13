@@ -1,0 +1,72 @@
+{% extends "accounts/base.html" %}
+
+{% block dashboard_content %}
+<div class="container-xxl">
+  <div class="mb-3">
+    <h3>Complete Urgent Purchase</h3>
+    <div class="text-muted">Branch: {{ purchase.branch }} | Purchase PUR-{{ purchase.purchase_id|stringformat:"s"|slice:":8" }}</div>
+  </div>
+
+  <form method="post">
+    {% csrf_token %}
+    <div class="card mb-3">
+      <div class="card-body row g-3">
+        <div class="col-md-5">
+          <label class="form-label">Supplier</label>
+          <select name="supplier_id" class="form-select" required>
+            <option value="">Select supplier</option>
+            {% for supplier in suppliers %}
+              <option value="{{ supplier.id }}" {% if supplier.id == purchase.supplier_id %}selected{% endif %}>{{ supplier.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Purchase Date</label>
+          <input type="date" name="purchase_date" class="form-control" value="{{ purchase.purchase_date|date:'Y-m-d' }}" required>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">Unit costs</div>
+      <div class="table-responsive">
+        <table class="table table-bordered mb-0 align-middle">
+          <thead>
+            <tr><th>Product</th><th>Quantity</th><th style="width:220px">Unit Cost</th><th class="text-end">Line Total</th></tr>
+          </thead>
+          <tbody>
+            {% for line in purchase.lines.all %}
+              <tr>
+                <td>{{ line.product }}</td>
+                <td>{{ line.qty|floatformat:2 }}</td>
+                <td><input type="number" name="cost_{{ line.id }}" class="form-control cost-input" min="0" step="0.0001" value="{{ line.buying_cost|default:'' }}" required></td>
+                <td class="text-end">KES <span class="line-total">0.00</span></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr><th colspan="3" class="text-end">Grand Total</th><th class="text-end">KES <span id="grand-total">0.00</span></th></tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+    <button class="btn btn-success mt-3"><i class="bi bi-check-circle me-1"></i>Save Urgent Purchase</button>
+  </form>
+</div>
+
+<script>
+function refreshTotals() {
+  let total = 0;
+  document.querySelectorAll('.cost-input').forEach((input) => {
+    const qty = Number(input.closest('tr').children[1].textContent) || 0;
+    const lineTotal = qty * (Number(input.value) || 0);
+    input.closest('tr').querySelector('.line-total').textContent = lineTotal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    total += lineTotal;
+  });
+  document.getElementById('grand-total').textContent = total.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+}
+document.querySelectorAll('.cost-input').forEach((input) => input.addEventListener('input', refreshTotals));
+refreshTotals();
+</script>
+{% endblock %}

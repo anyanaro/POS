@@ -1,0 +1,905 @@
+{% load static %}
+{% load static branch_tags %}
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>POS System</title>
+
+  <!-- Bootstrap CSS & Icons -->
+
+  <link href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+  <link href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.bootstrap5.min.css" rel="stylesheet">
+  <link href="https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css" rel="stylesheet">
+  
+
+  <style>
+    /* DataTables */
+
+    .dataTables_wrapper .dt-buttons{
+        margin-bottom:10px;
+    }
+
+    .dataTables_wrapper .dataTables_filter input{
+        border-radius:8px;
+    }
+
+    .dataTables_wrapper .dataTables_length select{
+        border-radius:8px;
+    }
+
+    table.dataTable thead th{
+        white-space:nowrap;
+    }
+
+    .table-responsive{
+      width:100%;
+      overflow-x:auto;
+      -webkit-overflow-scrolling:touch;
+    }
+
+    *, *::before, *::after{
+      box-sizing:border-box;
+    }
+
+    html, body{
+      max-width:100%;
+      overflow-x:hidden;
+    }
+
+    img, video, canvas{
+      max-width:100%;
+      height:auto;
+    }
+
+    table.erp-table{
+      width:100% !important;
+    }
+
+    .report-filters > [class*="col-"]{
+      min-width: 170px;
+    }
+
+    .report-grid > [class*="col-xl-"]{
+      min-width: 0;
+    }
+
+    .dt-buttons .btn{
+        margin-right:4px;
+    }
+
+    body.dark table.dataTable{
+        color:#fff;
+    }
+
+    body.dark .dataTables_wrapper{
+        color:#fff;
+    }
+    :root{
+      --sidebar-bg: #1e1f26;
+      --sidebar-text: #cfd2d6;
+      --sidebar-hover: #2a2d34;
+      --sidebar-active: #0d6efd;
+      --sidebar-border: #2b2d33;
+    }
+    body.dark{
+      --sidebar-bg: #14151a;
+      --sidebar-text: #e4e6eb;
+      --sidebar-hover: #1f2025;
+      --sidebar-active: #0dcaf0;
+      --sidebar-border: #232428;
+      background-color:#0f0f10;
+      color:#f1f1f1;
+    }
+
+    .sidebar{
+      width: 248px;
+      height: 100vh;
+      position: fixed;
+      top: 0; left: 0;
+      display: flex;
+      flex-direction: column;
+      background: var(--sidebar-bg);
+      color: var(--sidebar-text);
+      border-right: 1px solid var(--sidebar-border);
+      padding: 14px 10px 18px;
+      z-index: 1040; /* sit below navbar (z=1045) when mobile */
+      overflow-y: auto;
+      overflow-x: hidden;
+      scrollbar-width: thin;
+      scrollbar-color: #59616d transparent;
+      transition: left .25s ease, width .25s ease;
+    }
+    .sidebar::-webkit-scrollbar{
+      width: 7px;
+    }
+    .sidebar::-webkit-scrollbar-thumb{
+      background: #59616d;
+      border-radius: 10px;
+    }
+    .sidebar > *{
+      position: relative;
+      z-index: 1;
+    }
+
+    .sidebar .brand{
+      display: flex;
+      align-items: center;
+      min-height: 48px;
+      font-weight: 800;
+      font-size: 13px;
+      letter-spacing: 1.5px;
+      color: #fff;
+      padding: 0 12px;
+      margin: 0 0 10px;
+      border-bottom: 1px solid rgba(255,255,255,.09);
+    }
+    .sidebar .brand::before{
+      content: "POS";
+      display: grid;
+      place-items: center;
+      width: 30px;
+      height: 30px;
+      margin-right: 10px;
+      border-radius: 8px;
+      background: var(--sidebar-active);
+      color: #fff;
+      font-size: 10px;
+      letter-spacing: .5px;
+    }
+    .sidebar .nav-link{
+      color: var(--sidebar-text);
+      display: flex; align-items: center; gap: 10px;
+      min-height: 42px;
+      margin: 2px 0;
+      padding: 10px 12px;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      transition: background .2s ease, color .2s ease, border-color .2s ease;
+      text-decoration: none;
+      font-size: 14px;
+    }
+    .sidebar .nav-link:hover{
+      background: var(--sidebar-hover);
+      color: #fff;
+      border-color: rgba(255,255,255,.07);
+    }
+    .sidebar .nav-link.active{
+      background: var(--sidebar-active);
+      color: #fff !important;
+      border-color: rgba(255,255,255,.18);
+      box-shadow: 0 4px 12px rgba(0,0,0,.14);
+    }
+    .sidebar .nav-link .badge{
+      margin-left: auto;
+    }
+    .menu-section{
+      margin-top: 10px;
+    }
+    
+    .menu-title{
+      padding: 18px 12px 6px;
+      margin-top: 6px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #8c939d;
+      letter-spacing: 1.4px;
+      border-top: 1px solid rgba(255,255,255,.07);
+    }
+    
+    .sidebar.collapsed .menu-title{
+      display:none;
+    }
+    
+    .sidebar .collapse .nav-link{
+      padding-left: 38px;
+      min-height: 38px;
+      font-size: 13px;
+      border-radius: 7px;
+    }
+    .sidebar.collapsed .collapse{
+      display:none !important;
+  } 
+    .submenu .nav-link{
+      padding-left: 38px;
+      font-size: 13px;
+    }
+    
+    .menu-toggle{
+      cursor:pointer;
+    }
+    
+    .menu-toggle .arrow{
+      margin-left:auto;
+      transition: transform .2s;
+    }
+    
+    .menu-toggle.open .arrow{
+      transform: rotate(90deg);
+    }
+
+    /* Content area */
+    #content{
+      margin-left: 248px;
+      padding: 24px;
+      transition: margin-left .25s ease;
+      min-height: 100vh;
+    }
+
+    /* Collapsed (desktop) */
+    .sidebar.collapsed{ width: 72px; }
+    .sidebar.collapsed .nav-link span.label{ display: none; }
+    .sidebar.collapsed .brand{ display: none; }
+    .sidebar.collapsed + #content{ margin-left: 72px; }
+
+    /* Mobile behaviour */
+    @media (max-width: 992px){
+      .sidebar{ left: -248px; }
+      .sidebar.show{ left: 0; }
+      #content{ margin-left: 0; }
+    }
+
+    /* Compact desktop layout keeps report controls usable at normal zoom. */
+    @media (min-width: 993px) and (max-width: 1399px){
+      .sidebar{ width: 200px; }
+      .sidebar .nav-link{ padding-left: 14px; padding-right: 14px; }
+      .sidebar .collapse .nav-link,
+      .sidebar .submenu .nav-link{ padding-left: 32px; }
+      #content{ margin-left: 200px; padding: 16px; }
+    }
+
+    @media (min-width: 993px) and (max-width: 1199px){
+      .sidebar:not(.collapsed){ width: 200px; }
+      #content{ margin-left:200px; padding:16px; }
+      .sidebar.collapsed + #content{ margin-left:72px; }
+    }
+
+    /* Navbar cosmetics */
+    .navbar{
+      position: sticky;
+      top: 0;
+      z-index: 1050;
+      border-bottom: 1px solid #e7e7e7;
+      backdrop-filter: blur(8px);
+    }
+  </style>
+</head>
+<body>
+
+
+<!-- Sidebar -->
+
+<aside id="sidebar" class="sidebar">
+
+  <div class="brand px-3 mb-3">
+      POS SYSTEM
+  </div>
+
+{% with path=request.path %}
+
+  <!-- ===================== DASHBOARD ===================== -->
+
+<a class="nav-link {% if path == '/' or path|slice:':11' == '/dashboard/' or path == '/dashboard/' %}active{% endif %}"
+  href="{% url 'accounts:dashboard' %}"> <i class="bi bi-speedometer2"></i> <span class="label">Dashboard</span> </a>
+
+  <!-- ===================== BRANCH OPERATIONS ===================== -->
+
+  <div class="menu-title">Branch Operations</div>
+
+<a class="nav-link {% if path == '/sales/' %}active{% endif %}"
+  href="{% url 'accounts:sales' %}"> <i class="bi bi-cash-stack"></i> <span class="label">Sales</span> </a>
+
+<a class="nav-link {% if '/sales/quote' in path %}active{% endif %}"
+  href="{% url 'accounts:sales-quote' %}"> <i class="bi bi-file-earmark-pdf"></i> <span class="label">Sales Quote</span> </a>
+
+<a class="nav-link {% if '/returns' in path %}active{% endif %}"
+  href="{% url 'accounts:returns' %}"> <i class="bi bi-arrow-counterclockwise"></i> <span class="label">Returns</span> </a>
+
+<a class="nav-link {% if '/stock-receipts' in path %}active{% endif %}"
+  href="{% url 'accounts:stock-receipts' %}"> <i class="bi bi-box-arrow-in-down"></i> <span class="label">Stock Receipts</span> </a>
+
+  <!-- ===================== INVENTORY ===================== -->
+
+<div class="menu-title">Inventory</div>
+
+<a class="nav-link {% if '/products' in path or path == '/inventory/' or '/branch-stock-availability' in path or '/transfer-create' in path or '/transfers' in path or '/transfer-suggestions' in path or '/batch' in path or '/expiry' in path or '/inventory/profit-reports' in path or '/physical-stock-take' in path %}active{% endif %}"
+   data-bs-toggle="collapse"
+   href="#inventoryMenu"
+   role="button"
+  aria-expanded="{% if '/products' in path or '/product-import' in path or path == '/inventory/' or '/branch-stock-availability' in path or '/transfer-create' in path or '/transfers' in path or '/transfer-suggestions' in path or '/batch' in path or '/expiry' in path or '/inventory/profit-reports' in path or '/physical-stock-take' in path %}true{% else %}false{% endif %}"
+   aria-controls="inventoryMenu">
+
+    <i class="bi bi-box-seam"></i>
+    <span class="label">Inventory</span>
+    <i class="bi bi-chevron-down ms-auto"></i>
+</a>
+
+<div class="collapse {% if '/products' in path or '/product-import' in path or path == '/inventory/' or '/branch-stock-availability' in path or '/transfer-create' in path or '/transfers' in path or '/transfer-suggestions' in path or '/batch' in path or '/expiry' in path or '/inventory/profit-reports' in path or '/physical-stock-take' in path %}show{% endif %}"
+     id="inventoryMenu">
+
+    <!-- PRODUCTS -->
+    <a class="nav-link submenu-link {% if '/products' in path %}active{% endif %}"
+       href="{% url 'accounts:products' %}">
+        <i class="bi bi-box"></i>
+        <span class="label">Products</span>
+    </a>
+
+    <a class="nav-link submenu-link {% if '/product-import' in path %}active{% endif %}"
+       href="{% url 'accounts:product-import' %}">
+      <i class="bi bi-file-earmark-spreadsheet"></i>
+      <span class="label">Product Import</span>
+    </a>
+
+    <!-- INVENTORY -->
+    <a class="nav-link submenu-link d-flex align-items-center justify-content-between {% if path == '/inventory/' %}active{% endif %}"
+       href="{% url 'accounts:inventory' %}">
+
+        <span class="d-flex align-items-center">
+            <i class="bi bi-archive me-2"></i>
+            <span class="label">Inventory</span>
+        </span>
+
+        {% if low_stock_count and low_stock_count > 0 %}
+            <span class="badge {% if low_stock_count > 20 %}bg-danger{% elif low_stock_count > 10 %}bg-warning text-dark{% else %}bg-success{% endif %}">
+                {{ low_stock_count }}
+            </span>
+        {% endif %}
+    </a>
+
+    <!-- BRANCH STOCK AVAILABILITY -->
+    <a class="nav-link submenu-link {% if '/branch-stock-availability' in path %}active{% endif %}"
+       href="{% url 'accounts:branch-stock-availability' %}">
+        <i class="bi bi-diagram-2"></i>
+        <span class="label">Branch Stock Availability</span>
+    </a>
+
+    <!-- CREATE STOCK TRANSFER -->
+    <a class="nav-link submenu-link {% if '/transfers/create/' in path %}active{% endif %}"
+       href="{% url 'accounts:transfer-create' %}">
+        <i class="bi bi-plus-circle"></i>
+        <span class="label">Create Stock Transfer</span>
+    </a>
+
+    <!-- STOCK TRANSFER ACTIONS -->
+    <a class="nav-link submenu-link {% if '/transfers/' in path and '/transfers/create/' not in path %}active{% endif %}"
+       href="{% url 'accounts:transfers' %}">
+        <i class="bi bi-arrow-left-right"></i>
+        <span class="label">Stock Transfer Actions</span>
+    </a>
+
+    <a class="nav-link submenu-link {% if '/transfer-suggestions' in path %}active{% endif %}"
+       href="{% url 'accounts:stock-transfer-suggestions' %}">
+      <i class="bi bi-lightbulb"></i>
+      <span class="label">Transfer Suggestions</span>
+    </a>
+
+    <!-- BATCH TRACKING -->
+    <a class="nav-link submenu-link {% if '/batch' in path %}active{% endif %}"
+       href="{% url 'accounts:batch-tracking' %}">
+        <i class="bi bi-layers"></i>
+        <span class="label">Batch Tracking</span>
+    </a>
+
+    <!-- EXPIRY MONITORING -->
+    <a class="nav-link submenu-link {% if '/expiry' in path %}active{% endif %}"
+       href="{% url 'accounts:expiry-monitoring' %}">
+        <i class="bi bi-calendar-x"></i>
+        <span class="label">Expiry Monitoring</span>
+    </a>
+
+    <!-- INVENTORY AND PROFIT REPORTS -->
+    <a class="nav-link submenu-link {% if '/inventory/profit-reports' in path %}active{% endif %}"
+       href="{% url 'accounts:inventory-profit-reports' %}">
+      <i class="bi bi-clipboard-data"></i>
+      <span class="label">Inventory and Profit Reports</span>
+    </a>
+
+    <a class="nav-link submenu-link {% if '/physical-stock-take' in path %}active{% endif %}"
+       href="{% url 'accounts:physical-stock-take' %}">
+      <i class="bi bi-clipboard2-check"></i>
+      <span class="label">Physical Stock Take</span>
+    </a>
+
+</div>
+
+  <!-- ===================== PROCUREMENT ===================== -->
+
+  <div class="menu-title">Procurement</div>
+
+<a class="nav-link {% if '/purchases' in path or '/reorder' in path or '/requisition' in path or '/consolidated' in path or '/rfq' in path or '/purchase-order' in path or '/goods-receipt' in path or '/supplier-invoice' in path %}active{% endif %}"
+  data-bs-toggle="collapse"
+  href="#procurementMenu"
+  role="button"
+  aria-expanded="{% if '/purchases' in path or '/reorder' in path or '/requisition' in path or '/consolidated' in path or '/rfq' in path or '/purchase-order' in path or '/goods-receipt' in path or '/supplier-invoice' in path %}true{% else %}false{% endif %}"
+  aria-controls="procurementMenu"> <i class="bi bi-cart-plus"></i> <span class="label">Procurement</span> <i class="bi bi-chevron-down ms-auto"></i> </a>
+
+  <div class="collapse {% if '/purchases' in path or '/reorder' in path or '/requisition' in path or '/consolidated' in path or '/rfq' in path or '/purchase-order' in path or '/goods-receipt' in path or '/supplier-invoice' in path %}show{% endif %}"
+       id="procurementMenu">
+
+    <a class="nav-link submenu-link {% if '/purchases/urgent/new' in path %}active{% endif %}"
+     href="{% url 'accounts:urgent-requisition' %}">
+      <i class="bi bi-lightning-charge"></i>
+      <span class="label">Urgent Requisition</span>
+    </a>
+
+      <a class="nav-link submenu-link {% if '/purchases/urgent' in path %}active{% endif %}"
+       href="{% url 'accounts:urgent-purchases' %}">
+        <i class="bi bi-lightning-charge-fill"></i>
+        <span class="label">Urgent Purchases</span>
+  </a>
+
+  <a class="nav-link submenu-link {% if '/reorder' in path %}active{% endif %}"
+     href="{% url 'accounts:reorder-list' %}">
+      <i class="bi bi-arrow-repeat"></i>
+      <span class="label">Re-order List</span>
+  </a>
+
+  <a class="nav-link submenu-link {% if '/requisition' in path %}active{% endif %}"
+     href="{% url 'accounts:requisitions' %}">
+      <i class="bi bi-file-earmark-text"></i>
+      <span class="label">Requisitions</span>
+  </a>
+
+  <a class="nav-link submenu-link {% if '/consolidated' in path %}active{% endif %}"
+     href="{% url 'accounts:consolidated-orders' %}">
+      <i class="bi bi-diagram-3"></i>
+      <span class="label">Consolidated Orders</span>
+  </a>
+
+  <a class="nav-link submenu-link {% if '/rfq' in path %}active{% endif %}"
+     href="{% url 'accounts:rfqs' %}">
+      <i class="bi bi-file-earmark-check"></i>
+      <span class="label">Request for Quotes</span>
+  </a>
+
+  <a class="nav-link submenu-link {% if '/purchase-order' in path %}active{% endif %}"
+     href="{% url 'accounts:purchase-orders' %}">
+      <i class="bi bi-file-earmark-check"></i>
+      <span class="label">Purchase Orders</span>
+  </a>
+
+  <a class="nav-link submenu-link {% if '/goods-receipt' in path %}active{% endif %}"
+     href="{% url 'accounts:goods-receipts' %}">
+      <i class="bi bi-truck"></i>
+      <span class="label">Goods Receipts</span>
+  </a>
+
+  <a class="nav-link submenu-link {% if '/supplier-invoice' in path %}active{% endif %}"
+     href="{% url 'accounts:supplier-invoices' %}">
+      <i class="bi bi-receipt"></i>
+      <span class="label">Supplier Invoices</span>
+  </a>
+
+  </div>
+
+  <!-- ===================== FINANCE ===================== -->
+
+  <div class="menu-title">Finance</div>
+
+<a class="nav-link {% if '/supplier-ledger' in path or '/invoice-posting' in path or '/payments' in path or '/cost-analysis' in path %}active{% endif %}"
+  data-bs-toggle="collapse"
+  href="#financeMenu"
+  role="button"
+  aria-expanded="{% if '/supplier-ledger' in path or '/invoice-posting' in path or '/payments' in path or '/cost-analysis' in path %}true{% else %}false{% endif %}"
+  aria-controls="financeMenu"> <i class="bi bi-wallet2"></i> <span class="label">Finance</span> <i class="bi bi-chevron-down ms-auto"></i> </a>
+
+  <div class="collapse {% if '/supplier-ledger' in path or '/invoice-posting' in path or '/payments' in path or '/cost-analysis' in path %}show{% endif %}"
+       id="financeMenu">
+
+  <a class="nav-link submenu-link {% if '/supplier-ledger' in path %}active{% endif %}"
+     href="{% url 'accounts:supplier-ledger' %}">
+      <i class="bi bi-journal-bookmark"></i>
+      <span class="label">Supplier Ledger</span>
+  </a>
+
+  <a class="nav-link submenu-link {% if '/invoice-posting' in path %}active{% endif %}"
+     href="{% url 'accounts:invoice-posting' %}">
+      <i class="bi bi-file-earmark-arrow-up"></i>
+      <span class="label">Paid Invoices</span>
+  </a>
+
+  <a class="nav-link submenu-link {% if '/payments' in path %}active{% endif %}"
+     href="{% url 'accounts:payments' %}">
+      <i class="bi bi-wallet2"></i>
+      <span class="label">Payments</span>
+  </a>
+
+  <a class="nav-link submenu-link {% if '/cost-analysis' in path %}active{% endif %}"
+     href="{% url 'accounts:cost-analysis' %}">
+      <i class="bi bi-graph-up"></i>
+      <span class="label">Cost Analysis</span>
+  </a>
+
+  </div>
+
+  <!-- ===================== INSURANCE ===================== -->
+
+<div class="menu-title">Insurance</div>
+
+<a class="nav-link {% if '/insurances' in path or '/insurance-schemes' in path %}active{% endif %}"
+   data-bs-toggle="collapse"
+   href="#insuranceMenu"
+   role="button"
+   aria-expanded="{% if '/insurances' in path or '/insurance-schemes' in path %}true{% else %}false{% endif %}"
+   aria-controls="insuranceMenu">
+    <i class="bi bi-shield-check"></i>
+    <span class="label">Insurance</span>
+    <i class="bi bi-chevron-down ms-auto"></i>
+</a>
+
+<div class="collapse {% if '/insurances' in path or '/insurance-schemes' in path %}show{% endif %}"
+     id="insuranceMenu">
+
+    <!-- Insurance Companies -->
+    <a class="nav-link submenu-link {% if '/insurances' in path %}active{% endif %}"
+       href="{% url 'accounts:insurance_list' %}">
+        <i class="bi bi-building"></i>
+        <span class="label">Insurance Companies</span>
+    </a>
+
+    <!-- Insurance Schemes -->
+    <a class="nav-link submenu-link {% if '/insurance-schemes' in path %}active{% endif %}"
+       href="{% url 'accounts:insurance_scheme_list' %}">
+        <i class="bi bi-card-checklist"></i>
+        <span class="label">Insurance Schemes</span>
+    </a>
+
+</div>
+
+<!-- ===================== REPORTS ===================== -->
+
+<div class="menu-title">Reports</div>
+
+<a class="nav-link {% if '/reports' in path or '/stock-aging' in path or '/procurement-savings' in path or '/supplier-performance' in path or '/margin-analysis' in path or '/analytics' in path %}active{% endif %}"
+   data-bs-toggle="collapse"
+   href="#reportsMenu"
+   role="button"
+  aria-expanded="{% if '/reports' in path or '/stock-aging' in path or '/procurement-savings' in path or '/supplier-performance' in path or '/margin-analysis' in path or '/analytics' in path %}true{% else %}false{% endif %}"
+   aria-controls="reportsMenu">
+
+    <i class="bi bi-graph-up-arrow"></i>
+    <span class="label">Reports</span>
+    <i class="bi bi-chevron-down ms-auto"></i>
+</a>
+
+<div class="collapse {% if '/reports' in path or '/stock-aging' in path or '/procurement-savings' in path or '/supplier-performance' in path or '/margin-analysis' in path or '/analytics' in path %}show{% endif %}"
+     id="reportsMenu">
+
+    <a class="nav-link submenu-link {% if '/reports' in path %}active{% endif %}"
+       href="{% url 'accounts:reports' %}">
+        <i class="bi bi-bar-chart"></i>
+        <span class="label">Reports Centre</span>
+    </a>
+
+    <a class="nav-link submenu-link {% if '/analytics' in path %}active{% endif %}"
+       href="{% url 'accounts:analytics-dashboard' %}">
+      <i class="bi bi-speedometer2"></i>
+      <span class="label">Smart Analytics</span>
+    </a>
+
+    <a class="nav-link submenu-link {% if '/sales-forecasting' in path %}active{% endif %}"
+       href="{% url 'accounts:sales-forecasting' %}">
+      <i class="bi bi-graph-up-arrow"></i>
+      <span class="label">Sales Forecasting</span>
+    </a>
+
+    <a class="nav-link submenu-link {% if '/procurement-plan' in path %}active{% endif %}"
+       href="{% url 'accounts:procurement-plan' %}">
+      <i class="bi bi-clipboard-data"></i>
+      <span class="label">Procurement Plan</span>
+    </a>
+
+    <a class="nav-link submenu-link {% if '/stock-aging' in path %}active{% endif %}"
+       href="{% url 'accounts:stock-aging' %}">
+        <i class="bi bi-hourglass-split"></i>
+        <span class="label">Stock Aging</span>
+    </a>
+
+    <a class="nav-link submenu-link {% if '/procurement-savings' in path %}active{% endif %}"
+       href="{% url 'accounts:procurement-savings' %}">
+        <i class="bi bi-piggy-bank"></i>
+        <span class="label">Procurement Savings</span>
+    </a>
+
+    <a class="nav-link submenu-link {% if '/supplier-performance' in path %}active{% endif %}"
+       href="{% url 'accounts:supplier-performance' %}">
+        <i class="bi bi-award"></i>
+        <span class="label">Supplier Performance</span>
+    </a>
+
+    <a class="nav-link submenu-link {% if '/margin-analysis' in path %}active{% endif %}"
+       href="{% url 'accounts:margin-analysis' %}">
+        <i class="bi bi-percent"></i>
+        <span class="label">Margin Analysis</span>
+    </a>
+
+    <a class="nav-link submenu-link {% if '/data-quality' in path %}active{% endif %}" href="{% url 'accounts:data-quality' %}"><i class="bi bi-shield-exclamation"></i><span class="label">Data Quality</span></a>
+    <a class="nav-link submenu-link {% if '/supplier-price-intelligence' in path %}active{% endif %}" href="{% url 'accounts:supplier-price-intelligence' %}"><i class="bi bi-graph-up"></i><span class="label">Supplier Price Intelligence</span></a>
+    <a class="nav-link submenu-link {% if '/abc-analysis' in path %}active{% endif %}" href="{% url 'accounts:abc-analysis' %}"><i class="bi bi-pie-chart"></i><span class="label">ABC Product Analysis</span></a>
+    <a class="nav-link submenu-link {% if '/forecast-accuracy' in path %}active{% endif %}" href="{% url 'accounts:forecast-accuracy' %}"><i class="bi bi-bullseye"></i><span class="label">Forecast Accuracy</span></a>
+
+</div>
+
+  <!-- ===================== ADMINISTRATION ===================== -->
+
+  <div class="menu-title">Administration</div>
+
+<a class="nav-link {% if '/suppliers' in path %}active{% endif %}"
+  href="{% url 'accounts:supplier-manage' %}"> <i class="bi bi-people"></i> <span class="label">Suppliers</span> </a>
+
+<a class="nav-link {% if '/integrations/business-central' in path %}active{% endif %}"
+  href="{% url 'accounts:business-central' %}"> <i class="bi bi-cloud-arrow-up"></i> <span class="label">Business Central Integration</span> </a>
+
+  <hr class="text-secondary mx-3">
+
+  <!-- ===================== LOGOUT ===================== -->
+
+  <a class="nav-link" href="{% url 'accounts:logout' %}">
+      <i class="bi bi-door-open"></i>
+      <span class="label">Logout</span>
+  </a>
+
+{% endwith %}
+
+</aside>
+
+
+  <!-- Top Navbar -->
+  <nav class="navbar navbar-expand-lg bg-body-tertiary">
+    <div class="container-fluid">
+      <!-- Mobile: open/close sidebar -->
+      <button class="btn btn-outline-secondary d-lg-none me-2" type="button" id="btnMobileSidebar">
+        <i class="bi bi-list"></i>
+      </button>
+
+      <!-- Desktop: collapse/minify sidebar -->
+      <button class="btn btn-outline-secondary d-none d-lg-inline-flex me-2" type="button" id="btnCollapseSidebar" title="Collapse sidebar">
+        <i class="bi bi-layout-sidebar-inset"></i>
+      </button>
+
+      <a class="navbar-brand fw-semibold" href="{% url 'accounts:dashboard' %}">POS</a>
+
+      <div class="ms-auto d-flex align-items-center gap-2">
+        <!-- Theme toggle -->
+        <button class="btn btn-outline-secondary" id="btnTheme" title="Toggle theme">
+          <i class="bi bi-moon-stars"></i>
+        </button>
+
+        {% if request.user.is_authenticated %}
+        <span class="small text-secondary d-none d-sm-inline">Hi,</span>
+        <span class="fw-semibold d-none d-sm-inline">{{ request.user.username }}</span>
+  
+        <!-- ACTIVE BRANCH INDICATOR + DROPDOWN -->
+        <div class="dropdown me-3">
+          <button class="btn btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown">
+            <i class="bi bi-shop-window me-1"></i>
+            {% if request.session.active_branch_id %}
+            <span class="small text-secondary d-none d-sm-inline">Branch,</span>
+              {{ request.session.active_branch_id|branch_name }} 
+            {% else %}
+              Select Branch
+            {% endif %}
+          </button>
+      
+          <ul class="dropdown-menu dropdown-menu-end">
+            {% for link in request.user.branch_links.all %}
+              <li>
+                <a class="dropdown-item branch-switch"
+                   data-branch="{{ link.branch.id }}">
+                  {{ link.branch.name }}
+                  {% if link.is_default %}<span class="badge bg-info ms-2">default</span>{% endif %}
+                </a>
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+        <span class="badge bg-primary">{{ request.user.profile.role }}</span>
+      
+
+        
+      {% endif %}
+      </div>
+    </div>
+  </nav>
+
+  <!-- Content -->
+  <main id="content">
+    {% if messages %}
+      <div class="container px-0">
+        {% for message in messages %}
+          <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    {% block dashboard_content %}{% endblock %}
+  </main>
+
+
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.bootstrap5.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.print.min.js"></script>
+<script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
+<script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
+
+<script>
+
+    (function(){
+      const dataTableOptions = {
+        responsive: true,
+        pageLength: 25,
+        lengthMenu: [[10,25,50,100,-1], [10,25,50,100,"All"]],
+        order: [],
+        ordering: true,
+        searching: true,
+        autoWidth: false,
+        dom: "<'row mb-3'<'col-md-6'B><'col-md-6'f>>rt<'row mt-3'<'col-md-6'i><'col-md-6'p>>",
+        buttons: [
+          {extend:'excelHtml5', text:'<i class="bi bi-file-earmark-excel me-1"></i> Excel', className:'btn btn-success btn-sm'},
+          {extend:'csvHtml5', text:'<i class="bi bi-filetype-csv me-1"></i> CSV', className:'btn btn-primary btn-sm'},
+          {extend:'print', text:'<i class="bi bi-printer me-1"></i> Print', className:'btn btn-secondary btn-sm'}
+        ]
+      };
+
+      function normalizeStaticRows(table){
+        const columnCount = $(table).find('thead tr:first th').length;
+        $(table).find('tbody tr').each(function(){
+          const cells = $(this).children('td,th');
+          if (cells.length === 1 && cells.first().attr('colspan')) {
+            const message = cells.first().html();
+            let html = `<td>${message}</td>`;
+            for (let i = 1; i < columnCount; i++) html += '<td></td>';
+            $(this).html(html);
+          }
+        });
+      }
+
+      window.initErpTables = function(){
+        $('.erp-table').each(function(){
+          if ($(this).attr('data-dynamic-table') === 'true') return;
+          if ($.fn.DataTable.isDataTable(this)) return;
+          normalizeStaticRows(this);
+          const columnCount = $(this).find('thead tr:first th').length;
+          const invalid = $(this).find('tbody tr').toArray().some(row => $(row).children('td,th').length !== columnCount);
+          if (!invalid && columnCount) $(this).DataTable(dataTableOptions);
+        });
+      };
+
+      $(document).ready(function(){
+        window.initErpTables();
+        $('#branchFilter').on('change', function(){
+          $('.erp-table').each(function(){
+            if (!$.fn.DataTable.isDataTable(this)) return;
+            const table = $(this).DataTable();
+            const branchColumn = table.columns().indexes().toArray().find(index => $(table.column(index).header()).text().trim() === 'Branch');
+            if (branchColumn !== undefined) table.column(branchColumn).search($(this).val() ? '^' + $(this).val() + '$' : '', true, false).draw();
+          });
+        });
+      });
+    })();
+
+  
+  </script>
+  
+
+  <!-- Bootstrap JS -->
+
+  <script>
+    // Theme persistence
+    (function(){
+      const saved = localStorage.getItem('theme');
+      if (saved === 'dark') {
+        document.body.classList.add('dark');
+        document.documentElement.setAttribute('data-bs-theme','dark');
+      }
+    })();
+
+    document.getElementById('btnTheme')?.addEventListener('click', () => {
+      const isDark = document.body.classList.toggle('dark');
+      document.documentElement.setAttribute('data-bs-theme', isDark ? 'dark' : 'light');
+      localStorage.setItem('theme', isDark ? 'dark' : 'light');
+    });
+
+    // Sidebar: mobile slide + desktop collapse
+    const sidebar = document.getElementById('sidebar');
+    document.getElementById('btnMobileSidebar')?.addEventListener('click', () => {
+      sidebar.classList.toggle('show'); // mobile slide-in
+    });
+    document.getElementById('btnCollapseSidebar')?.addEventListener('click', () => {
+      sidebar.classList.toggle('collapsed'); // desktop minify
+    });
+
+    // Close mobile sidebar when clicking outside (optional)
+    document.addEventListener('click', (e) => {
+      if (window.innerWidth < 992) {
+        if (!sidebar.contains(e.target) && !e.target.closest('#btnMobileSidebar')) {
+          sidebar.classList.remove('show');
+        }
+      }
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    document.querySelectorAll('.branch-switch').forEach(item => {
+      item.addEventListener('click', async () => {
+        const branchId = item.dataset.branch;
+    
+        const resp = await fetch("{% url 'accounts:set-branch' %}", {
+          method: "POST",
+          headers: {
+            "X-CSRFToken": "{{ csrf_token }}",
+            "X-Requested-With": "XMLHttpRequest"
+          },
+          body: new URLSearchParams({branch_id: branchId})
+        });
+    
+        if (resp.ok) {
+          location.reload();  // refresh to apply active branch context
+        }
+      });
+    });
+    </script>
+    <style>
+      .fab{
+          position: fixed;
+          right:20px;
+          bottom:24px;
+          z-index:1080;
+      }
+      .fab .dropdown-menu{
+          inset:auto auto 60px auto !important;
+          transform:translate3d(0,0,0)!important;
+      }
+      </style>
+      
+      <div class="fab dropdown">
+          <button class="btn btn-primary btn-lg rounded-circle shadow dropdown-toggle"
+                  data-bs-toggle="dropdown"
+                  aria-expanded="false"
+                  title="Quick Actions">
+      
+              <i class="bi bi-plus-lg"></i>
+      
+          </button>
+      
+          <ul class="dropdown-menu dropdown-menu-end shadow">
+      
+              <li>
+                  <a class="dropdown-item" href="{% url 'accounts:sales-submit' %}">
+                      <i class="bi bi-plus-circle me-2"></i>
+                      New Sale
+                  </a>
+              </li>
+      
+              <li>
+                  <a class="dropdown-item" href="{% url 'accounts:products-list' %}">
+                      <i class="bi bi-box-seam me-2"></i>
+                      Add Product
+                  </a>
+              </li>
+      
+              <li>
+                  <a class="dropdown-item" href="{% url 'accounts:stock-adjust' %}">
+                      <i class="bi bi-arrow-repeat me-2"></i>
+                      Stock Adjustment
+                  </a>
+              </li>
+      
+          </ul>
+      </div>
+      
+      </body>
+      </html>

@@ -1,0 +1,146 @@
+{% extends "accounts/base.html" %}
+{% block dashboard_content %}
+{% block title %}
+    {% if mode == "edit" %}Edit Insurance{% else %}New Insurance{% endif %}
+{% endblock %}
+
+{% block page_title %}
+<i class="bi bi-building me-1"></i>
+{% if mode == "edit" %}Edit Insurance{% else %}New Insurance{% endif %}
+{% endblock %}
+
+
+<div class="container-fluid mt-4">
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body">
+
+            <form method="post">
+                {% csrf_token %}
+
+                <!-- ================= PRIMARY PANEL ================= -->
+                <div class="p-3 mb-4 border rounded bg-light">
+
+                    <div class="row g-4 align-items-end">
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold fs-5">
+                                <i class="bi bi-link-45deg me-1"></i> BC Number <span class="text-danger">*</span>
+                            </label>
+                            {{ form.bc_number }}
+                            {% for error in form.bc_number.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                        </div>
+
+                        <!-- NAME -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold fs-5">
+                                <i class="bi bi-card-text me-1"></i> Insurance Name
+                            </label>
+                            {{ form.name }}
+                        </div>
+
+                        <!-- CONTACT PERSON -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">
+                                <i class="bi bi-person me-1"></i> Contact Person
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="bi bi-person"></i>
+                                </span>
+                                {{ form.contact_person }}
+                            </div>
+                        </div>
+
+                        <!-- PHONE -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">
+                                <i class="bi bi-telephone me-1"></i> Phone
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="bi bi-telephone"></i>
+                                </span>
+                                {{ form.phone }}
+                            </div>
+                        </div>
+
+                        <!-- EMAIL -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">
+                                <i class="bi bi-envelope me-1"></i> Email
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="bi bi-envelope"></i>
+                                </span>
+                                {{ form.email }}
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- ================= SECONDARY PANEL ================= -->
+                <div class="border-top pt-4">
+                    <div class="row g-4">
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">
+                                <i class="bi bi-geo-alt me-1"></i> Address
+                            </label>
+                            {{ form.address }}
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">
+                                <i class="bi bi-chat-left-text me-1"></i> Remarks
+                            </label>
+                            {{ form.remarks }}
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- ================= STATUS (EDIT ONLY) ================= -->
+                {% if mode == "edit" %}
+                    <div class="mt-4 p-3 border rounded bg-light">
+                        <label class="form-label fw-semibold d-flex align-items-center gap-2">
+                            <i class="bi bi-toggle-on"></i> Status
+                        </label>
+
+                        <div class="form-check form-switch fs-5">
+                            {{ form.is_active }}
+                            <label class="form-check-label ms-2">
+                                Active
+                            </label>
+                        </div>
+                    </div>
+                {% endif %}
+
+
+                <!-- ================= ACTIONS ================= -->
+                <div class="mt-4 d-flex justify-content-between">
+
+                    <a href="{% url 'accounts:insurance_list' %}" class="btn btn-outline-secondary">
+                        Back
+                    </a>
+                
+                    <button type="submit" class="btn btn-primary px-4 shadow-sm">
+                        <i class="bi bi-save me-1"></i>
+                        {% if mode == "edit" %}
+                            Save Changes
+                        {% else %}
+                            Create Insurance
+                        {% endif %}
+                    </button>
+                
+                </div>
+
+            </form>
+
+        </div>
+    </div>
+
+</div>
+{% endblock %}

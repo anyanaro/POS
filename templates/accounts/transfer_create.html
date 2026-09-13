@@ -1,0 +1,446 @@
+{% extends "accounts/base.html" %}
+
+{% block dashboard_content %}
+
+<div class="card shadow-sm">
+
+    <div class="card-header">
+
+        <h4>
+            <i class="bi bi-arrow-left-right me-2"></i>
+            New Stock Transfer
+        </h4>
+
+    </div>
+
+    <div class="card-body">
+
+        <form id="transferForm">
+
+            {% csrf_token %}
+
+            <div class="row g-3 mb-4">
+
+                <div class="col-md-6">
+
+                    <label class="form-label">
+                        From Branch
+                    </label>
+
+                    <select
+                        id="fromBranch"
+                        class="form-select"
+                        required>
+
+                        <option value="">Select source branch</option>
+                        {% for b in branches %}
+                        <option value="{{ b.id }}" {% if b.id == initial_from_branch_id %}selected{% endif %}>
+                            {{ b.name }}
+                        </option>
+                        {% endfor %}
+
+                    </select>
+
+                </div>
+
+                <div class="col-md-6">
+
+                    <label class="form-label">
+                        To Branch
+                    </label>
+
+                    <select
+                        id="toBranch"
+                        class="form-select"
+                        required>
+
+                        <option value="">Select destination branch</option>
+                        {% for b in branches %}
+                        <option value="{{ b.id }}" {% if b.id == initial_to_branch_id %}selected{% endif %}>
+                            {{ b.name }}
+                        </option>
+                        {% endfor %}
+
+                    </select>
+
+                </div>
+
+            </div>
+
+            <div id="transfer-errors" class="alert alert-danger d-none py-2 mb-3" role="alert"></div>
+
+            <div class="d-flex justify-content-between align-items-center mb-3">
+
+                <h5 class="mb-0">
+                    Transfer Items
+                </h5>
+
+
+            </div>
+
+            <table
+                id="transferLinesTable"
+                class="table table-bordered table-hover erp-table align-middle w-100"
+                data-dynamic-table="true">
+
+                <thead>
+
+                    <tr>
+                        <th>Product</th>
+                        <th width="170">Available at source</th>
+                        <th width="150">Quantity</th>
+                        <th width="100">Action</th>
+                    </tr>
+
+                </thead>
+
+                <tbody id="transferLinesBody">
+
+                </tbody>
+
+            </table>
+
+            <datalist id="transfer-product-options"></datalist>
+
+            <div class="d-flex justify-content-end gap-2 mt-3">
+
+                <button
+                    type="button"
+                    id="addLine"
+                    class="btn btn-outline-primary">
+            
+                    <i class="bi bi-plus-circle me-1"></i>
+                    Add Item
+            
+                </button>
+            
+                <button
+                    type="submit"
+                    class="btn btn-primary">
+            
+                    <i class="bi bi-send me-1"></i>
+                    Submit Transfer Request
+            
+                </button>
+            
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+{{ initial_product_ids|json_script:"initial-product-ids" }}
+
+<script>
+
+const productAvailability = new Map();
+const productOptions = document.getElementById("transfer-product-options");
+const initialProductIds = JSON.parse(document.getElementById("initial-product-ids").textContent);
+let initialLinesPopulated = false;
+
+function addLine() {
+
+    const row = `
+
+        <tr>
+
+            <td>
+
+                <input type="search" class="form-control product-search"
+                       list="transfer-product-options"
+                       placeholder="Choose or search product"
+                       autocomplete="off" disabled required>
+                <input type="hidden" class="product">
+
+            </td>
+
+            <td>
+
+                <div class="source-stock text-muted small" aria-live="polite">
+                    Select a product
+                </div>
+
+            </td>
+
+            <td>
+
+                <input
+                    type="number"
+                    min="0.0001"
+                    step="0.0001"
+                    class="form-control qty"
+                    required
+                    disabled>
+
+            </td>
+
+            <td>
+
+                <button
+                    type="button"
+                    class="btn btn-danger btn-sm removeLine">
+
+                    <i class="bi bi-trash"></i>
+
+                </button>
+
+            </td>
+
+        </tr>
+
+    `;
+
+    const linesBody = document.getElementById("transferLinesBody");
+    linesBody.insertAdjacentHTML("beforeend", row);
+
+    const newRow = linesBody.lastElementChild;
+    if (productAvailability.size) {
+        newRow.querySelector(".product-search").disabled = false;
+        newRow.querySelector(".source-stock").textContent = "Search products";
+    }
+}
+
+document
+    .getElementById("addLine")
+    .addEventListener(
+        "click",
+        addLine
+    );
+
+document.addEventListener(
+    "click",
+    function(e){
+
+        if(
+            e.target.closest(".removeLine")
+        ){
+
+            e.target
+                .closest("tr")
+                .remove();
+
+        }
+
+    }
+);
+
+function refreshLineAvailability(row) {
+    const productSearch = row.querySelector(".product-search");
+    const productInput = row.querySelector(".product");
+    const quantityInput = row.querySelector(".qty");
+    const stockDisplay = row.querySelector(".source-stock");
+    const selectedProduct = productAvailability.get(productSearch.value);
+
+    quantityInput.value = "";
+    quantityInput.disabled = true;
+
+    if (!selectedProduct) {
+        productInput.value = "";
+        stockDisplay.textContent = "Choose a product from the suggestions";
+        stockDisplay.className = "source-stock text-muted small";
+        return;
+    }
+
+    productInput.value = selectedProduct.id;
+    quantityInput.max = String(selectedProduct.available);
+    quantityInput.disabled = false;
+    stockDisplay.textContent = `${selectedProduct.available} available`;
+    stockDisplay.className = "source-stock text-success fw-semibold small";
+}
+
+function populateInitialLines() {
+    if (initialLinesPopulated || !initialProductIds.length || !productAvailability.size) return;
+    initialLinesPopulated = true;
+
+    const linesBody = document.getElementById("transferLinesBody");
+    linesBody.innerHTML = "";
+
+    const productsById = new Map();
+    productAvailability.forEach(function(product) { productsById.set(product.id, product); });
+
+    initialProductIds.forEach(function(productId) {
+        const product = productsById.get(productId);
+        if (!product) return;
+        addLine();
+        const row = linesBody.lastElementChild;
+        row.querySelector(".product-search").value = product.label;
+        refreshLineAvailability(row);
+    });
+
+    if (!linesBody.children.length) addLine();
+}
+
+async function loadAvailableProducts() {
+    const fromBranchId = document.getElementById("fromBranch").value;
+    const rows = document.querySelectorAll("#transferLinesBody tr");
+    productAvailability.clear();
+    productOptions.innerHTML = "";
+
+    rows.forEach(function(row) {
+        row.querySelector(".product-search").value = "";
+        row.querySelector(".product-search").disabled = true;
+        refreshLineAvailability(row);
+    });
+    if (!fromBranchId) return;
+
+    try {
+        const response = await fetch(
+            `{% url 'accounts:transfer-available-products' %}?branch_id=${encodeURIComponent(fromBranchId)}`,
+            { credentials: "same-origin", headers: { "X-Requested-With": "XMLHttpRequest" } }
+        );
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Could not load products.");
+
+        data.results.forEach(function(product) {
+            productAvailability.set(product.label, product);
+            const option = document.createElement("option");
+            option.value = product.label;
+            productOptions.appendChild(option);
+        });
+
+        if (initialProductIds.length && !initialLinesPopulated) {
+            populateInitialLines();
+            return;
+        }
+
+        rows.forEach(function(row) {
+            const search = row.querySelector(".product-search");
+            search.disabled = false;
+            row.querySelector(".source-stock").textContent = data.results.length
+                ? "Search products"
+                : "No sellable stock at source";
+        });
+    } catch (error) {
+        rows.forEach(function(row) {
+            row.querySelector(".source-stock").textContent = "Could not load source stock";
+            row.querySelector(".source-stock").className = "source-stock text-danger small";
+        });
+    }
+}
+
+document.getElementById("transferLinesBody").addEventListener("input", function(event) {
+    if (event.target.matches(".product-search")) {
+        refreshLineAvailability(event.target.closest("tr"));
+    }
+});
+
+document.getElementById("fromBranch").addEventListener("change", function() {
+    loadAvailableProducts();
+});
+
+if (!initialProductIds.length) addLine();
+loadAvailableProducts();
+
+document.getElementById(
+    "transferForm"
+).addEventListener(
+    "submit",
+    async function(e){
+
+        e.preventDefault();
+
+        const items = [];
+        const errorBox = document.getElementById("transfer-errors");
+        const fromBranchId = document.getElementById("fromBranch").value;
+        const toBranchId = document.getElementById("toBranch").value;
+        const productIds = new Set();
+
+        errorBox.classList.add("d-none");
+        errorBox.textContent = "";
+
+        if (!fromBranchId || !toBranchId) {
+            errorBox.textContent = "Select both a source and destination branch.";
+            errorBox.classList.remove("d-none");
+            return;
+        }
+        if (fromBranchId === toBranchId) {
+            errorBox.textContent = "Source and destination branch must be different.";
+            errorBox.classList.remove("d-none");
+            return;
+        }
+
+        document
+            .querySelectorAll(
+                "#transferLinesBody tr"
+            )
+            .forEach(function(row){
+
+                const productId = row.querySelector(".product").value;
+                const quantity = row.querySelector(".qty").value;
+                if (!productId || Number(quantity) <= 0) {
+                    errorBox.textContent = "Select a product and enter a quantity greater than zero for every line.";
+                    errorBox.classList.remove("d-none");
+                    return;
+                }
+                if (productIds.has(productId)) {
+                    errorBox.textContent = "Add each product once, then adjust its quantity on that line.";
+                    errorBox.classList.remove("d-none");
+                    return;
+                }
+                productIds.add(productId);
+                items.push({
+
+                    product_id:
+                        productId,
+
+                    qty:
+                        quantity
+
+                });
+
+            });
+
+        if (!errorBox.classList.contains("d-none")) {
+            return;
+        }
+
+        const response =
+            await fetch(
+                "{% url 'accounts:transfer-request-save' %}",
+                {
+                    method:"POST",
+
+                    headers:{
+                        "Content-Type":
+                            "application/json",
+
+                        "X-CSRFToken":
+                            "{{ csrf_token }}"
+                    },
+
+                    body:JSON.stringify({
+
+                        from_branch_id: fromBranchId,
+
+                        to_branch_id: toBranchId,
+
+                        items: items
+
+                    })
+
+                }
+            );
+
+        const data =
+            await response.json();
+
+        if(data.success){
+
+            window.location.href =
+                "{% url 'accounts:transfer-history' %}";
+
+        } else {
+
+            errorBox.textContent = data.error || "Transfer could not be created.";
+            errorBox.classList.remove("d-none");
+
+        }
+
+    }
+);
+
+</script>
+
+{% endblock %}

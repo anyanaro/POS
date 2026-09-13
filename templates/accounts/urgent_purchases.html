@@ -1,0 +1,66 @@
+{% extends "accounts/base.html" %}
+
+{% block dashboard_content %}
+<div class="container-xxl">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h3>Urgent Purchases</h3>
+      <div class="text-muted">Urgent requisitions for the active branch</div>
+    </div>
+    <a href="{% url 'accounts:urgent-requisition' %}" class="btn btn-danger">
+      <i class="bi bi-lightning-charge me-1"></i>New Urgent Requisition
+    </a>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table table-bordered table-hover align-middle erp-table">
+      <thead>
+        <tr>
+          <th>Purchase</th>
+          <th>Branch</th>
+          <th>Products</th>
+          <th>Supplier</th>
+          <th>Purchase Date</th>
+          <th class="text-end">Total</th>
+          <th>Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for purchase in purchases %}
+          <tr>
+            <td>PUR-{{ purchase.purchase_id|stringformat:"s"|slice:":8" }}</td>
+            <td>{{ purchase.branch }}</td>
+            <td>
+              {% for line in purchase.lines.all %}
+                <div>{{ line.product }} x {{ line.qty|floatformat:2 }}</div>
+              {% endfor %}
+            </td>
+            <td>{{ purchase.supplier|default:"Pending" }}</td>
+            <td>{{ purchase.purchase_date }}</td>
+            <td class="text-end">KES {{ purchase.total|floatformat:2 }}</td>
+            <td>
+              {% if purchase.has_receipts %}
+                <span class="badge bg-info text-dark">GRN started</span>
+              {% else %}
+                <span class="badge bg-warning text-dark">Urgent</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if purchase.has_receipts %}
+                <span class="text-muted"><i class="bi bi-lock me-1"></i>Locked after GRN</span>
+              {% else %}
+                <a href="{% url 'accounts:urgent-purchase-edit' purchase.purchase_id %}" class="btn btn-sm btn-outline-primary">
+                  <i class="bi bi-pencil me-1"></i>Complete Details
+                </a>
+              {% endif %}
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="8" class="text-center text-muted py-4">No urgent purchases found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

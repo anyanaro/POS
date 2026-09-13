@@ -1,0 +1,171 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>POS • Sign in</title>
+
+  <!-- Bootstrap + Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
+  <style>
+    :root{
+      --radius: 14px;
+    }
+
+    body{
+      min-height:100vh;
+      display:flex;
+      flex-direction:column;
+      background: linear-gradient(135deg, #f8fafc, #eef2f7);
+    }
+
+    [data-bs-theme="dark"] body{
+      background: linear-gradient(135deg, #0f172a, #020617);
+    }
+
+    main{
+      flex:1;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:32px 16px;
+    }
+
+    /* Glass Auth Card */
+    .auth-card{
+      width:100%;
+      max-width:1000px;
+      padding: 40px;
+      border-radius: var(--radius);
+      backdrop-filter: blur(14px);
+      background: rgba(255,255,255,0.75);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+      transition: all .25s ease;
+    }
+
+    [data-bs-theme="dark"] .auth-card{
+      background: rgba(15,23,42,0.75);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+
+    .auth-card:hover{
+      transform: translateY(-2px);
+    }
+
+    .brand-logo{
+      font-weight: 700;
+      letter-spacing: .5px;
+    }
+
+    .navbar{
+      backdrop-filter: blur(10px);
+      background: rgba(255,255,255,0.7) !important;
+    }
+
+    [data-bs-theme="dark"] .navbar{
+      background: rgba(2,6,23,0.7) !important;
+    }
+
+    .footer{
+      font-size: 12px;
+      opacity: .7;
+    }
+
+  </style>
+</head>
+<body>
+
+<!-- ================= NAVBAR ================= -->
+<nav class="navbar navbar-expand-lg border-bottom sticky-top">
+  <div class="container-fluid">
+
+    <a class="navbar-brand brand-logo" href="{% url 'accounts:dashboard' %}">
+      POS<span class="text-primary">.</span>
+    </a>
+
+    <div class="ms-auto d-flex align-items-center gap-2">
+
+      <!-- Theme Toggle -->
+      <button class="btn btn-sm btn-outline-secondary" id="btnTheme">
+        <i class="bi bi-moon-stars"></i>
+      </button>
+
+      {% if request.user.is_authenticated %}
+        <span class="small text-muted d-none d-sm-inline">
+          {{ request.user.username }}
+        </span>
+
+        <a class="btn btn-sm btn-primary" href="{% url 'accounts:dashboard' %}">
+          <i class="bi bi-speedometer2 me-1"></i> Dashboard
+        </a>
+      {% else %}
+        <a class="btn btn-sm btn-outline-primary" href="{% url 'accounts:login' %}">
+          Login
+        </a>
+        <a class="btn btn-sm btn-success" href="{% url 'accounts:register' %}">
+          Get Started
+        </a>
+      {% endif %}
+    </div>
+  </div>
+</nav>
+
+
+<!-- ================= MAIN ================= -->
+<main>
+
+  <div class="auth-card">
+
+    <!-- Title -->
+    <div class="text-center mb-4">
+        <h3 class="fw-semibold mb-2">Welcome back</h3>
+      <div class="text-muted small">Sign in to continue to your POS</div>
+    </div>
+
+    <!-- Messages -->
+    {% if messages %}
+      {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
+          {{ message }}
+          <button class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      {% endfor %}
+    {% endif %}
+
+    <!-- Dynamic Content -->
+    {% block dashboard_content %}{% endblock %}
+
+  </div>
+
+</main>
+
+
+<!-- ================= FOOTER ================= -->
+<footer class="text-center footer py-3">
+  © {{ now|date:"Y" }} POS System • Built for scale
+</footer>
+
+
+<!-- ================= JS ================= -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+  // Theme Toggle (Light/Dark)
+  const btn = document.getElementById('btnTheme');
+  const html = document.documentElement;
+
+  btn.addEventListener('click', () => {
+    const current = html.getAttribute('data-bs-theme');
+    html.setAttribute('data-bs-theme', current === 'dark' ? 'light' : 'dark');
+
+    btn.innerHTML = current === 'dark'
+      ? '<i class="bi bi-moon-stars"></i>'
+      : '<i class="bi bi-sun"></i>';
+  });
+</script>
+
+</body>
+</html>

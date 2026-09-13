@@ -1,0 +1,142 @@
+{% extends "accounts/base.html" %}
+
+{% block dashboard_content %}
+
+<h3 class="mb-3">
+    <i class="bi bi-arrow-left-right me-2"></i>
+    Request Stock Transfer
+</h3>
+
+<div class="card shadow-sm">
+    <div class="card-body">
+
+        <form id="transferForm">
+
+            {% csrf_token %}
+
+            <div class="row">
+
+                <div class="col-md-12 mb-3">
+                    <label>Original requisition allocation (optional)</label>
+                    <select class="form-select" id="allocation">
+                        <option value="">General transfer</option>
+                        {% for allocation in allocations %}
+                            <option value="{{ allocation.id }}"
+                                    data-product="{{ allocation.consolidated_line.product_id }}"
+                                    data-branch="{{ allocation.requisition.branch_id }}"
+                                    data-qty="{{ allocation.fulfilled_qty|floatformat:4 }}">
+                                {{ allocation.consolidated_line.product }} to {{ allocation.requisition.branch }}
+                                (available {{ allocation.fulfilled_qty|floatformat:2 }})
+                            </option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text">Selecting an allocation locks the destination to the original requisition branch.</div>
+                </div>
+
+                <div class="col-md-4">
+                    <label>Product</label>
+
+                    <select
+                        class="form-select"
+                        id="product">
+
+                        {% for p in products %}
+                            <option value="{{ p.id }}">
+                                {{ p.sku }} - {{ p.name }}
+                            </option>
+                        {% endfor %}
+
+                    </select>
+                </div>
+
+                <div class="col-md-3">
+                    <label>From Branch</label>
+
+                    <select
+                        class="form-select"
+                        id="fromBranch">
+
+                        {% for b in branches %}
+                            <option value="{{ b.id }}">
+                                {{ b.name }}
+                            </option>
+                        {% endfor %}
+
+                    </select>
+                </div>
+
+                <div class="col-md-3">
+                    <label>To Branch</label>
+
+                    <select
+                        class="form-select"
+                        id="toBranch">
+
+                        {% for b in branches %}
+                            <option value="{{ b.id }}">
+                                {{ b.name }}
+                            </option>
+                        {% endfor %}
+
+                    </select>
+                </div>
+
+                <div class="col-md-2">
+                    <label>Qty</label>
+
+                    <input
+                        type="number"
+                        class="form-control"
+                        id="qty">
+                </div>
+
+            </div>
+
+            <button
+                type="submit"
+                class="btn btn-primary mt-3">
+
+                Submit Request
+
+            </button>
+
+        </form>
+
+    </div>
+</div>
+
+<script>
+document.getElementById('allocation').addEventListener('change', function () {
+    const option = this.selectedOptions[0];
+    if (!this.value) return;
+    document.getElementById('product').value = option.dataset.product;
+    document.getElementById('toBranch').value = option.dataset.branch;
+    document.getElementById('qty').max = option.dataset.qty;
+});
+
+document.getElementById('transferForm').addEventListener('submit', async function (event) {
+    event.preventDefault();
+    const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    const response = await fetch("{% url 'accounts:transfer-request-save' %}", {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf},
+        body: JSON.stringify({
+            from_branch_id: document.getElementById('fromBranch').value,
+            to_branch_id: document.getElementById('toBranch').value,
+            items: [{
+                product_id: document.getElementById('product').value,
+                qty: document.getElementById('qty').value,
+                allocation_id: document.getElementById('allocation').value || null
+            }]
+        })
+    });
+    const data = await response.json();
+    if (!response.ok) {
+        alert(data.error || 'Unable to create transfer request.');
+        return;
+    }
+    window.location.href = "{% url 'accounts:transfers' %}";
+});
+</script>
+
+{% endblock %}

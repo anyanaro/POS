@@ -1,0 +1,388 @@
+{% extends "accounts/base.html" %}
+
+{% block dashboard_content %}
+
+<div class="container-fluid">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+
+        <div>
+
+            <h3 class="mb-0">
+                <i class="bi bi-file-earmark-plus text-primary me-2"></i>
+                
+                {% if requisition %}
+                   Edit Requisition
+                {% else %}
+                    New Requisition
+                {% endif %}
+
+            </h3>
+
+            <div class="text-muted">
+                Create a branch purchase request
+            </div>
+
+        </div>
+
+
+        <a href=" {% url 'accounts:requisitions' %}">
+            <button class="btn btn-primary">
+    
+                <i class="bi bi-arrow-left"></i>
+                Back
+    
+            </button>
+    
+        </a>
+
+    </div>
+
+    <div class="card shadow-sm border-0">
+
+        <div class="card-body">
+
+            <form method="post"
+                  id="requisitionForm">
+
+                {% csrf_token %}
+
+                <div class="row g-3">
+
+                    <div class="col-md-6">
+
+                        <label class="form-label">
+                            Requisition Number
+                            <span class="text-danger">*</span>
+                        </label>
+
+                        
+                        <input
+                            type="text"
+                            name="requisition_no"
+                            class="form-control"
+                            value="{% if requisition %}{{ requisition.requisition_no }}{% else %}{{ preview_number }}{% endif %}"
+                            readonly>
+
+
+                        <div class="invalid-feedback">
+                            Requisition Number is required.
+                        </div>
+
+                    </div>
+
+                    <div class="col-md-6">
+
+                        <label class="form-label">
+                            Required Date
+                            <span class="text-danger">*</span>
+                        </label>
+
+                        <input
+                            type="date"
+                            name="required_date"
+                            id="required_date"
+                            value="{{ requisition.required_date|date:'Y-m-d' }}"
+                            class="form-control"
+                            required>
+
+                        <div class="invalid-feedback">
+                            Required Date is mandatory.
+                        </div>
+
+                    </div>
+
+                    <div class="col-md-12">
+
+                        <label class="form-label">
+                            Purpose
+                        </label>
+
+                        <textarea
+                            name="remarks"
+                            rows="4"
+                            class="form-control"
+                            placeholder="Describe the purpose of this requisition">{{ requisition.remarks|default:'' }}</textarea>
+
+                    </div>
+
+                </div>
+
+                <hr>
+
+                <h5 class="mb-3">
+
+                    <i class="bi bi-box-seam text-primary me-2"></i>
+
+                    Requested Items
+
+                    <span id="itemCount" class="badge text-bg-secondary ms-2">1 item</span>
+
+                </h5>
+
+                <div class="table-responsive">
+
+                    <table id="requisitionItemsTable" class="table table-bordered table-hover align-middle">
+
+                        <thead class="table-light">
+
+                            <tr>
+                                <th>Item</th>
+                                <th width="120">Quantity</th>
+                                <th width="120">Action</th>
+                            </tr>
+
+                        </thead>
+
+                        <tbody id="itemsBody">
+
+                            {% if lines %}
+                            
+                                {% for line in lines %}
+                            
+                                <tr>
+                            
+                                    <td>
+                            
+                                        <select
+                                            name="product_id[]"
+                                            class="form-select"
+                                            required>
+                            
+                                            <option value="">
+                                                Select Product
+                                            </option>
+                            
+                                            {% for product in products %}
+                            
+                                            <option
+                                                value="{{ product.id }}"
+                                                {% if product.id == line.product.id %}selected{% endif %}>
+                            
+                                                {{ product }}
+                            
+                                            </option>
+                            
+                                            {% endfor %}
+                            
+                                        </select>
+                            
+                                    </td>
+                            
+                                    <td>
+                            
+                                        <input
+                                            type="number"
+                                            name="qty_requested[]"
+                                            class="form-control"
+                                            value="{{ line.qty_requested|floatformat:0 }}"
+                                            min="1"
+                                            step="0.0001"
+                                            required>
+                            
+                                    </td>
+                            
+                                    <td class="text-center">
+
+                                        <button
+                                            type="button"
+                                            class="btn btn-danger btn-sm remove-row">
+                                    
+                                            <i class="bi bi-trash"></i>
+                                    
+                                        </button>
+                                    
+                                    </td>
+                            
+                                </tr>
+                            
+                                {% endfor %}
+                            
+                            {% else %}
+                            
+                                <tr>
+                            
+                                    <td>
+                            
+                                        <select
+                                            name="product_id[]"
+                                            class="form-select"
+                                            required>
+                            
+                                            <option value="">
+                                                Select Product
+                                            </option>
+                            
+                                            {% for product in products %}
+                            
+                                            <option value="{{ product.id }}">
+                                                {{ product }}
+                                            </option>
+                            
+                                            {% endfor %}
+                            
+                                        </select>
+                            
+                                    </td>
+                            
+                                    <td>
+                            
+                                        <input
+                                            type="number"
+                                            name="qty_requested[]"
+                                            class="form-control"
+                                            min="1"
+                                            step="0.0001"
+                                            required>
+                            
+                                    </td>
+                            
+                                    <td>
+                            
+                                        <input
+                                            type="text"
+                                            class="form-control"
+                                            value="PCS"
+                                            readonly>
+                            
+                                    </td>
+                            
+                                </tr>
+                            
+                            {% endif %}
+                            
+                            </tbody>
+
+                    </table>
+
+                    <template id="requisitionItemTemplate">
+                        <tr>
+                            <td>
+                                <select name="product_id[]" class="form-select" required>
+                                    <option value="">Select Product</option>
+                                    {% for product in products %}
+                                    <option value="{{ product.id }}">{{ product }}</option>
+                                    {% endfor %}
+                                </select>
+                            </td>
+                            <td>
+                                <input type="number" name="qty_requested[]" class="form-control" min="0.0001" step="0.0001" required>
+                            </td>
+                            <td class="text-center">
+                                <button type="button" class="btn btn-outline-danger btn-sm remove-row" title="Remove item" aria-label="Remove item">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    </template>
+
+                    <div class="mt-3">
+
+                        <button
+                            type="button"
+                            id="addItem"
+                            class="btn btn-outline-primary">
+                    
+                            <i class="bi bi-plus-circle me-1"></i>
+                    
+                            Add Item
+                    
+                        </button>
+                    
+                    </div>
+
+                </div>
+
+                <div class="d-flex justify-content-end gap-2 mt-4">
+
+
+                    <a href=" {% url 'accounts:requisitions' %}">
+                        <button class="btn btn-secondary">
+                
+                            <i class="bi bi-arrow-left"></i>
+                            Cancel
+                
+                        </button>
+                
+                    </a>
+
+                    <button
+                        type="submit"
+                        class="btn btn-primary">
+                    
+                        <i class="bi bi-save me-1"></i>
+                    
+                        {% if requisition %}
+                            Update Requisition
+                        {% else %}
+                            Save Requisition
+                        {% endif %}
+                    
+                    </button>
+
+                </div>
+
+            </form>
+
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+
+    (function(){
+        const itemsBody = document.getElementById("itemsBody");
+        const addItem = document.getElementById("addItem");
+        const itemTemplate = document.getElementById("requisitionItemTemplate");
+        const itemCount = document.getElementById("itemCount");
+
+        function updateItemCount(){
+            const count = itemsBody.querySelectorAll("tr").length;
+            itemCount.textContent = `${count} ${count === 1 ? "item" : "items"}`;
+        }
+
+        addItem.addEventListener("click", function(){
+            itemsBody.appendChild(itemTemplate.content.cloneNode(true));
+            updateItemCount();
+            itemsBody.querySelector("tr:last-child select").focus();
+        });
+
+        itemsBody.addEventListener("click", function(event){
+            const removeButton = event.target.closest(".remove-row");
+            if (!removeButton || itemsBody.querySelectorAll("tr").length === 1) return;
+            removeButton.closest("tr").remove();
+            updateItemCount();
+        });
+
+        updateItemCount();
+    })();
+    
+    </script>
+
+<script>
+
+    document
+    .getElementById('requisitionForm')
+    .addEventListener('submit', function(e){
+    
+        let valid = true;
+    
+        const reqDate =
+            document.getElementById('required_date');
+    
+        if(reqDate.value===''){
+            reqDate.classList.add('is-invalid');
+            valid=false;
+        }
+    
+        if(!valid){
+            e.preventDefault();
+        }
+    
+    });
+    
+    </script>
+
+{% endblock %}

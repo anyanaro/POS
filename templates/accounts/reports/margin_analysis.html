@@ -1,0 +1,54 @@
+{% extends "accounts/base.html" %}
+{% block dashboard_content %}
+
+<h3>
+<i class="bi bi-percent text-danger me-2"></i>
+Margin Analysis
+</h3>
+
+<div class="card shadow-sm mt-3">
+
+<div class="card-body table-responsive">
+
+<table class="table erp-table">
+
+<thead>
+<tr>
+<th>Product</th>
+<th>Sales</th>
+<th>Cost</th>
+<th>Margin %</th>
+</tr>
+</thead>
+
+<tbody>
+
+{% for row in rows %}
+<tr>
+
+<td>{{ row.product }}</td>
+<td>KES {{ row.sales|floatformat:2 }}</td>
+<td>KES {{ row.cost|floatformat:2 }}</td>
+
+<td>
+
+<span class="badge bg-success">
+
+{{ row.margin }}%
+
+</span>
+
+</td>
+
+</tr>
+{% endfor %}
+
+</tbody>
+
+</table>
+
+</div>
+
+</div>
+
+{% endblock %}
